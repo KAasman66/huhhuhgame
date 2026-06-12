@@ -107,33 +107,52 @@ export class GameState {
   }
 
   renderMinimap(ctx) {
-    const minimapWidth = 200
-    const minimapHeight = 150
+    const minimapWidth = 220
+    const minimapHeight = 160
     const minimapX = this.width - minimapWidth - 20
     const minimapY = 20
 
     const scaleX = minimapWidth / this.width
     const scaleY = minimapHeight / this.height
 
-    // Background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+    // Background with gradient
+    const grad = ctx.createLinearGradient(minimapX, minimapY, minimapX, minimapY + minimapHeight)
+    grad.addColorStop(0, 'rgba(0, 20, 0, 0.9)')
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.9)')
+    ctx.fillStyle = grad
     ctx.fillRect(minimapX, minimapY, minimapWidth, minimapHeight)
-    ctx.strokeStyle = '#00ff00'
-    ctx.lineWidth = 2
+
+    // Minimap border
+    ctx.strokeStyle = COLORS.player
+    ctx.lineWidth = 3
     ctx.strokeRect(minimapX, minimapY, minimapWidth, minimapHeight)
 
+    // Inner frame
+    ctx.strokeStyle = 'rgba(34, 221, 0, 0.3)'
+    ctx.lineWidth = 1
+    ctx.strokeRect(minimapX + 1, minimapY + 1, minimapWidth - 2, minimapHeight - 2)
+
+    // Label
+    ctx.fillStyle = COLORS.player
+    ctx.font = 'bold 10px Courier'
+    ctx.fillText('TACTICAL MAP', minimapX + 6, minimapY + 12)
+
     // Player squad
-    ctx.fillStyle = '#00ff00'
+    ctx.fillStyle = COLORS.player
     for (const unit of this.squad.units) {
       if (unit.alive) {
         const px = minimapX + unit.x * scaleX
         const py = minimapY + unit.y * scaleY
         ctx.fillRect(px - 2, py - 2, 4, 4)
+        // Glow
+        ctx.strokeStyle = 'rgba(34, 221, 0, 0.5)'
+        ctx.lineWidth = 1
+        ctx.strokeRect(px - 3, py - 3, 6, 6)
       }
     }
 
     // Enemies
-    ctx.fillStyle = '#ff0000'
+    ctx.fillStyle = COLORS.enemy
     for (const enemy of this.enemies) {
       if (enemy instanceof Squad) {
         for (const unit of enemy.units) {
@@ -147,16 +166,23 @@ export class GameState {
         const px = minimapX + enemy.x * scaleX
         const py = minimapY + enemy.y * scaleY
         ctx.fillRect(px - 2, py - 2, 4, 4)
+        // Tank indicator
+        ctx.strokeStyle = 'rgba(221, 34, 34, 0.5)'
+        ctx.lineWidth = 1
+        ctx.strokeRect(px - 3, py - 3, 6, 6)
       }
     }
 
     // Buildings
-    ctx.fillStyle = '#ffff00'
+    ctx.fillStyle = COLORS.money
     for (const building of this.buildings) {
       if (building.alive) {
         const px = minimapX + building.x * scaleX
         const py = minimapY + building.y * scaleY
         ctx.fillRect(px - 2, py - 2, 4, 4)
+        ctx.strokeStyle = 'rgba(255, 255, 34, 0.5)'
+        ctx.lineWidth = 1
+        ctx.strokeRect(px - 3, py - 3, 6, 6)
       }
     }
   }
@@ -629,112 +655,194 @@ export class GameState {
   }
 
   renderLevelComplete(ctx) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, this.height)
+    grad.addColorStop(0, '#001100')
+    grad.addColorStop(1, '#000000')
+    ctx.fillStyle = grad
     ctx.fillRect(0, 0, this.width, this.height)
 
     // Victory animation effect
     const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7
-    ctx.fillStyle = `rgba(0, 255, 0, ${pulse * 0.3})`
+    ctx.fillStyle = `rgba(34, 221, 0, ${pulse * 0.2})`
     ctx.fillRect(0, 0, this.width, this.height)
 
-    ctx.fillStyle = '#00ff00'
-    ctx.font = 'bold 64px Arial'
+    // Victory box
+    ctx.fillStyle = 'rgba(0, 40, 0, 0.9)'
+    ctx.fillRect(this.width / 2 - 350, 80, 700, this.height - 160)
+    ctx.strokeStyle = COLORS.player
+    ctx.lineWidth = 3
+    ctx.strokeRect(this.width / 2 - 350, 80, 700, this.height - 160)
+
+    ctx.fillStyle = COLORS.player
+    ctx.font = 'bold 72px Courier'
     ctx.textAlign = 'center'
-    ctx.fillText('LEVEL COMPLETE!', this.width / 2, 150)
+    ctx.shadowColor = 'rgba(34, 221, 0, 0.8)'
+    ctx.shadowBlur = 20
+    ctx.fillText('MISSION COMPLETE!', this.width / 2, 160)
+    ctx.shadowColor = 'transparent'
 
-    ctx.font = '28px Arial'
-    ctx.fillStyle = '#ffff00'
-    ctx.fillText(`${this.levelConfig.name}`, this.width / 2, 220)
+    ctx.font = '28px Courier'
+    ctx.fillStyle = COLORS.money
+    ctx.fillText(`${this.levelConfig.name}`, this.width / 2, 230)
 
-    ctx.font = '22px Arial'
+    ctx.font = '18px Courier'
     ctx.fillStyle = COLORS.ui
     let y = 300
-    ctx.fillText(`Waves Survived: ${this.waveCount - 1}`, this.width / 2, y)
-    y += 50
-    ctx.fillText(`Enemies Killed: ${this.kills} x 100 = $${this.kills * 100}`, this.width / 2, y)
-    y += 50
-    ctx.fillText(`Civilians Rescued: ${this.rescued} x 500 = $${this.rescued * 500}`, this.width / 2, y)
-    y += 50
+    ctx.fillText(`Waves Survived ........ ${this.waveCount - 1}`, this.width / 2, y)
+    y += 40
+    ctx.fillText(`Enemies Killed ........ ${this.kills} x $100`, this.width / 2, y)
+    ctx.fillStyle = COLORS.money
+    ctx.fillText(`= $${this.kills * 100}`, this.width / 2 + 280, y)
+
+    ctx.fillStyle = COLORS.ui
+    y += 40
+    ctx.fillText(`Civilians Rescued ...... ${this.rescued} x $500`, this.width / 2, y)
+    ctx.fillStyle = COLORS.money
+    ctx.fillText(`= $${this.rescued * 500}`, this.width / 2 + 280, y)
 
     const speedBonus = this.waveCount > 5 ? 1000 : 0
     if (speedBonus > 0) {
-      ctx.fillStyle = '#ffff00'
-      ctx.fillText(`Speed Bonus: $${speedBonus}`, this.width / 2, y)
       ctx.fillStyle = COLORS.ui
-      y += 50
+      y += 40
+      ctx.fillText(`Speed Bonus`, this.width / 2, y)
+      ctx.fillStyle = COLORS.money
+      ctx.fillText(`= $${speedBonus}`, this.width / 2 + 280, y)
     }
 
     const totalReward = (this.kills * 100) + (this.rescued * 500) + this.money + speedBonus
-    ctx.fillStyle = '#00ff00'
-    ctx.font = 'bold 28px Arial'
-    ctx.fillText(`Total Reward: $${totalReward}`, this.width / 2, y + 30)
+    y += 50
+    ctx.fillStyle = COLORS.player
+    ctx.font = 'bold 24px Courier'
+    ctx.fillText(`TOTAL REWARD ........... $${totalReward}`, this.width / 2, y)
 
-    ctx.font = '18px Arial'
-    ctx.fillStyle = '#ffff00'
-    ctx.fillText(`Press E for next level or R to restart`, this.width / 2, this.height - 80)
+    ctx.font = '16px Courier'
+    ctx.fillStyle = COLORS.money
+    ctx.fillText(`Press [E] Next Level or [R] Restart`, this.width / 2, this.height - 70)
     ctx.textAlign = 'left'
   }
 
   renderLevelFailed(ctx) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, this.height)
+    grad.addColorStop(0, '#110000')
+    grad.addColorStop(1, '#000000')
+    ctx.fillStyle = grad
     ctx.fillRect(0, 0, this.width, this.height)
 
-    ctx.fillStyle = '#ff0000'
-    ctx.font = 'bold 48px Arial'
+    // Failure box
+    ctx.fillStyle = 'rgba(60, 0, 0, 0.9)'
+    ctx.fillRect(this.width / 2 - 300, 100, 600, 400)
+    ctx.strokeStyle = '#dd2222'
+    ctx.lineWidth = 3
+    ctx.strokeRect(this.width / 2 - 300, 100, 600, 400)
+
+    ctx.fillStyle = '#dd2222'
+    ctx.font = 'bold 72px Courier'
     ctx.textAlign = 'center'
-    ctx.fillText('LEVEL FAILED', this.width / 2, 200)
+    ctx.shadowColor = 'rgba(221, 34, 34, 0.8)'
+    ctx.shadowBlur = 20
+    ctx.fillText('MISSION FAILED', this.width / 2, 200)
+    ctx.shadowColor = 'transparent'
 
-    ctx.font = '24px Arial'
+    ctx.font = '20px Courier'
     ctx.fillStyle = COLORS.ui
-    ctx.fillText(`Waves Survived: ${this.waveCount}`, this.width / 2, 280)
-    ctx.fillText(`Enemies Killed: ${this.kills}`, this.width / 2, 330)
+    let y = 280
+    ctx.fillText(`Waves Survived ........ ${this.waveCount}`, this.width / 2, y)
+    y += 40
+    ctx.fillText(`Enemies Killed ........ ${this.kills}`, this.width / 2, y)
 
-    ctx.font = '18px Arial'
-    ctx.fillText('Press R to retry this level', this.width / 2, 430)
+    ctx.font = '18px Courier'
+    ctx.fillStyle = COLORS.money
+    y += 60
+    ctx.fillText('Press [R] to retry this level', this.width / 2, y)
     ctx.textAlign = 'left'
   }
 
   renderStartScreen(ctx) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.95)'
+    // Background gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, this.height)
+    grad.addColorStop(0, '#001100')
+    grad.addColorStop(1, '#000000')
+    ctx.fillStyle = grad
     ctx.fillRect(0, 0, this.width, this.height)
 
-    // Background animation
-    for (let i = 0; i < 20; i++) {
-      const x = (Math.sin(Date.now() / 1000 + i) * 100 + 1000) % this.width
-      const y = ((i * 60 + Date.now() / 20) % this.height)
-      ctx.fillStyle = 'rgba(0, 255, 0, 0.1)'
-      ctx.fillRect(x, y, 50, 20)
+    // Animated scanlines
+    ctx.strokeStyle = 'rgba(0, 255, 0, 0.03)'
+    ctx.lineWidth = 1
+    for (let i = 0; i < this.height; i += 2) {
+      ctx.beginPath()
+      ctx.moveTo(0, i + (Date.now() / 20) % 2)
+      ctx.lineTo(this.width, i + (Date.now() / 20) % 2)
+      ctx.stroke()
     }
 
-    ctx.fillStyle = '#00ff00'
-    ctx.font = 'bold 72px Arial'
+    // Animated background boxes
+    for (let i = 0; i < 15; i++) {
+      const x = (Math.sin(Date.now() / 2000 + i) * 150 + 1000) % this.width
+      const y = ((i * 80 + Date.now() / 30) % this.height)
+      ctx.fillStyle = 'rgba(34, 221, 0, 0.08)'
+      ctx.fillRect(x, y, 80, 40)
+      ctx.strokeStyle = 'rgba(34, 221, 0, 0.15)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(x, y, 80, 40)
+    }
+
+    // Title with shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+    ctx.font = 'bold 80px Courier'
     ctx.textAlign = 'center'
+    ctx.fillText('TACTICAL CHAOS', this.width / 2 + 3, 153)
+
+    ctx.fillStyle = COLORS.player
+    ctx.shadowColor = 'rgba(34, 221, 0, 0.8)'
+    ctx.shadowBlur = 20
     ctx.fillText('TACTICAL CHAOS', this.width / 2, 150)
+    ctx.shadowColor = 'transparent'
 
-    ctx.font = '32px Arial'
-    ctx.fillStyle = '#ffff00'
-    ctx.fillText(`Level ${this.level}: ${this.levelConfig.name}`, this.width / 2, 250)
+    // Level info box
+    ctx.fillStyle = 'rgba(0, 30, 0, 0.8)'
+    ctx.fillRect(this.width / 2 - 300, 220, 600, 180)
+    ctx.strokeStyle = COLORS.player
+    ctx.lineWidth = 2
+    ctx.strokeRect(this.width / 2 - 300, 220, 600, 180)
 
-    ctx.font = '20px Arial'
+    ctx.font = 'bold 32px Courier'
+    ctx.fillStyle = COLORS.money
+    ctx.textAlign = 'center'
+    ctx.fillText(`LEVEL ${this.level}: ${this.levelConfig.name}`, this.width / 2, 255)
+
+    ctx.font = '18px Courier'
     ctx.fillStyle = COLORS.ui
-    const desc = this.levelConfig.description
-    ctx.fillText(desc, this.width / 2, 320)
+    ctx.fillText(this.levelConfig.description, this.width / 2, 295)
 
-    ctx.font = '18px Arial'
-    ctx.fillStyle = '#aaffaa'
-    ctx.fillText('OBJECTIVES:', this.width / 2, 400)
-    ctx.font = '16px Arial'
+    // Objectives
+    ctx.font = 'bold 16px Courier'
+    ctx.fillStyle = COLORS.player
+    ctx.fillText('OBJECTIVES:', this.width / 2, 340)
+    ctx.font = '14px Courier'
+    ctx.fillStyle = COLORS.ui
     for (let i = 0; i < this.levelConfig.objectives.length; i++) {
-      ctx.fillText(`• ${this.levelConfig.objectives[i]}`, this.width / 2, 440 + i * 30)
+      ctx.fillText(`▪ ${this.levelConfig.objectives[i]}`, this.width / 2, 365 + i * 20)
     }
 
-    ctx.font = '20px Arial'
-    ctx.fillStyle = '#ffff00'
-    ctx.fillText('Press SPACE to start', this.width / 2, 650)
+    // Start button
+    const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7
+    ctx.fillStyle = `rgba(255, 255, 68, ${pulse * 0.8})`
+    ctx.fillRect(this.width / 2 - 150, 450, 300, 50)
+    ctx.strokeStyle = COLORS.money
+    ctx.lineWidth = 2
+    ctx.strokeRect(this.width / 2 - 150, 450, 300, 50)
 
-    ctx.font = '14px Arial'
+    ctx.font = 'bold 20px Courier'
+    ctx.fillStyle = '#000000'
+    ctx.fillText('PRESS SPACE TO START', this.width / 2, 485)
+
+    // Controls
+    ctx.font = '12px Courier'
     ctx.fillStyle = '#888888'
-    ctx.fillText('Controls: A=Move | D=Defend | S=Spread | E=Build | SPACE=Jeep | SHIFT=Tank', this.width / 2, 720)
+    ctx.textAlign = 'center'
+    ctx.fillText('A=MOVE | D=DEFEND | S=SPREAD | E=BUILD | SPACE=JEEP | SHIFT=TANK', this.width / 2, this.height - 30)
 
     ctx.textAlign = 'left'
   }
