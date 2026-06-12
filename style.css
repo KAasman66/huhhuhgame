@@ -5,38 +5,46 @@
 }
 
 body {
-  background: #222;
-  font-family: Arial, sans-serif;
+  background: #0a0a0a;
+  font-family: 'Courier New', monospace;
   overflow: hidden;
 }
 
 #gameCanvas {
   display: block;
   background: #1a1a1a;
-  border: 2px solid #444;
+  border: 3px solid #00ff00;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.3), inset 0 0 10px rgba(0, 255, 0, 0.1);
 }
 
 #hud {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  color: #00ff00;
+  top: 12px;
+  left: 12px;
+  color: #22dd00;
   font-weight: bold;
-  text-shadow: 0 0 5px #00ff00;
-  font-size: 14px;
+  text-shadow: 0 0 8px #22dd00, 0 0 16px rgba(34, 221, 0, 0.5);
+  font-size: 13px;
   z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 10px 14px;
+  border: 2px solid #22dd00;
+  border-radius: 4px;
 }
 
 #money {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
 }
 
 #units {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
 }
 
 #instructions {
-  font-size: 12px;
-  opacity: 0.7;
-  margin-top: 16px;
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 10px;
+  letter-spacing: 0.5px;
 }

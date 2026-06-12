@@ -23,32 +23,51 @@ export class GameMap {
   }
 
   render(ctx) {
-    // Subtle grass with pattern
+    // HD terrain - layered grass
     ctx.fillStyle = COLORS.grass
     ctx.fillRect(0, 0, this.width, this.height)
 
-    // Subtle noise texture
-    for (let i = 0; i < 100; i++) {
-      ctx.fillStyle = Math.random() > 0.5 ? '#165c16' : '#1a6b1a'
-      ctx.fillRect(
-        Math.random() * this.width,
-        Math.random() * this.height,
-        Math.random() * 40 + 10,
-        Math.random() * 40 + 10
-      )
+    // Grass pattern detail (Cannon Fodder style)
+    const tileSize = 40
+    for (let x = 0; x < this.width; x += tileSize) {
+      for (let y = 0; y < this.height; y += tileSize) {
+        const isLight = (Math.floor(x / tileSize) + Math.floor(y / tileSize)) % 2 === 0
+        ctx.fillStyle = isLight ? COLORS.grass : COLORS.grassDark
+        ctx.fillRect(x, y, tileSize, tileSize)
+
+        // Grass texture dots
+        ctx.fillStyle = isLight ? COLORS.grassDark : COLORS.grass
+        for (let i = 0; i < 3; i++) {
+          const px = x + Math.random() * tileSize
+          const py = y + Math.random() * tileSize
+          ctx.fillRect(px, py, 2, 2)
+        }
+      }
     }
 
-    // Faint grid lines (optional, for debugging)
+    // Dirt patches
+    ctx.fillStyle = COLORS.dirt
+    ctx.globalAlpha = 0.3
+    for (let i = 0; i < 20; i++) {
+      const x = Math.random() * this.width
+      const y = Math.random() * this.height
+      ctx.beginPath()
+      ctx.arc(x, y, Math.random() * 40 + 20, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1.0
+
+    // Subtle grid for tactical overlay
     ctx.strokeStyle = COLORS.gridLine
     ctx.lineWidth = 0.5
-    ctx.globalAlpha = 0.1
-    for (let x = 0; x < this.width; x += this.gridSize * 2) {
+    ctx.globalAlpha = 0.08
+    for (let x = 0; x < this.width; x += this.gridSize * 4) {
       ctx.beginPath()
       ctx.moveTo(x, 0)
       ctx.lineTo(x, this.height)
       ctx.stroke()
     }
-    for (let y = 0; y < this.height; y += this.gridSize * 2) {
+    for (let y = 0; y < this.height; y += this.gridSize * 4) {
       ctx.beginPath()
       ctx.moveTo(0, y)
       ctx.lineTo(this.width, y)

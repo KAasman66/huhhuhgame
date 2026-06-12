@@ -23,25 +23,48 @@ export class Pickup {
   }
 
   render(ctx) {
-    const bob = Math.sin(this.bobOffset * Math.PI * 2) * 5
+    const bob = Math.sin(this.bobOffset * Math.PI * 2) * 6
+    const pulse = Math.sin(this.bobOffset * Math.PI * 4) * 0.3 + 0.7
 
     ctx.save()
     ctx.translate(this.x, this.y + bob)
+    ctx.globalAlpha = pulse
 
     if (this.type === 'ammo') {
-      ctx.fillStyle = '#ffff00'
+      // Ammo box
+      ctx.fillStyle = COLORS.money
       ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size)
-      ctx.strokeStyle = '#ff8800'
+
+      // Ammo detail
+      ctx.fillStyle = '#dd6600'
+      ctx.fillRect(-this.size / 2 + 2, -this.size / 2 + 2, this.size - 4, 3)
+      ctx.fillRect(-this.size / 2 + 2, this.size / 2 - 5, this.size - 4, 3)
+
+      // Glow
+      ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)'
       ctx.lineWidth = 2
-      ctx.strokeRect(-this.size / 2, -this.size / 2, this.size, this.size)
+      ctx.strokeRect(-this.size / 2 - 1, -this.size / 2 - 1, this.size + 2, this.size + 2)
     } else if (this.type === 'health') {
-      ctx.fillStyle = '#00ff00'
-      ctx.beginPath()
-      ctx.arc(0, 0, this.size, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.strokeStyle = '#00aa00'
+      // Health cross
+      ctx.fillStyle = COLORS.health
+      // Vertical
+      ctx.fillRect(-this.size / 3, -this.size, this.size * 0.66, this.size * 2)
+      // Horizontal
+      ctx.fillRect(-this.size, -this.size / 3, this.size * 2, this.size * 0.66)
+
+      // Glow
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)'
       ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(0, 0, this.size * 1.5, 0, Math.PI * 2)
       ctx.stroke()
+
+      // Center shine
+      ctx.fillStyle = '#ffffff'
+      ctx.globalAlpha = pulse * 0.6
+      ctx.beginPath()
+      ctx.arc(0, 0, this.size * 0.5, 0, Math.PI * 2)
+      ctx.fill()
     }
 
     ctx.restore()

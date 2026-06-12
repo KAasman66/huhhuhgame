@@ -93,67 +93,70 @@ export class Unit {
   render(ctx) {
     if (!this.alive) return
 
-    const color = this.isPlayer ? (this.selected ? COLORS.playerSelected : COLORS.player) : COLORS.enemy
+    const baseColor = this.isPlayer ? COLORS.player : COLORS.enemy
     const size = this.variant === 'heavy' ? this.size * 1.3 : this.variant === 'scout' ? this.size * 0.8 : this.size
 
     ctx.save()
     ctx.translate(this.x, this.y)
     ctx.rotate(this.angle)
 
-    // Body
-    ctx.fillStyle = color
+    // Shadow (ground)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
     ctx.beginPath()
-    ctx.arc(0, 0, size / 2.2, 0, Math.PI * 2)
+    ctx.ellipse(0, size / 2 + 2, size * 0.6, size * 0.15, 0, 0, Math.PI * 2)
     ctx.fill()
 
-    // Variant indicator
+    // Body - HD pixelated look
+    ctx.fillStyle = baseColor
+    ctx.fillRect(-size / 2.2, -size / 2.2, size / 1.1, size / 1.1)
+
+    // Armor plates (heavy)
     if (this.variant === 'heavy') {
-      ctx.fillStyle = '#666'
-      ctx.beginPath()
-      ctx.arc(-2, -2, 2, 0, Math.PI * 2)
-      ctx.fill()
-    } else if (this.variant === 'scout') {
-      ctx.fillStyle = '#ffff00'
-      ctx.beginPath()
-      ctx.arc(0, 0, 2, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+      ctx.fillRect(-size / 2.2 + 2, -size / 2.2 + 2, 3, 3)
+      ctx.fillRect(size / 2.2 - 5, -size / 2.2 + 2, 3, 3)
     }
+
+    // Head
+    ctx.fillStyle = this.isPlayer ? '#ffdd99' : '#dd8844'
+    ctx.fillRect(-size / 3, -size / 1.8, size * 0.66, size / 3)
+
+    // Eyes
+    ctx.fillStyle = this.selected ? '#ffff00' : '#000000'
+    ctx.fillRect(-size / 4.5, -size / 2, 2, 2)
+    ctx.fillRect(size / 4.5 - 2, -size / 2, 2, 2)
 
     // Gun barrel
     const barrelLength = this.variant === 'heavy' ? size / 1.5 : this.variant === 'scout' ? size / 1.2 : size / 2
-    ctx.strokeStyle = color
-    ctx.lineWidth = this.variant === 'heavy' ? 2.5 : 2
-    ctx.beginPath()
-    ctx.moveTo(0, 0)
-    ctx.lineTo(barrelLength, 0)
-    ctx.stroke()
+    const barrelWidth = this.variant === 'heavy' ? 3 : 2.5
+    ctx.fillStyle = '#333333'
+    ctx.fillRect(0, -barrelWidth / 2, barrelLength, barrelWidth)
 
-    // Eyes when selected
+    // Gun tip (muzzle brake)
+    ctx.fillStyle = '#666666'
+    ctx.fillRect(barrelLength - 2, -barrelWidth / 2 - 1, 2, barrelWidth + 2)
+
+    // Selection ring
     if (this.selected) {
-      ctx.fillStyle = '#ffff00'
-      ctx.beginPath()
-      ctx.arc(-3, -2, 1.5, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(3, -2, 1.5, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.strokeStyle = '#ffff44'
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.8
+      ctx.strokeRect(-size / 2.2 - 2, -size / 2.2 - 2, size / 1.1 + 4, size / 1.1 + 4)
+      ctx.globalAlpha = 1.0
     }
-
-    // Highlight border
-    ctx.strokeStyle = this.selected ? '#ffff00' : color
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.arc(0, 0, size / 2.2, 0, Math.PI * 2)
-    ctx.stroke()
 
     ctx.restore()
 
     // Health bar
     const healthPercent = this.health / this.maxHealth
-    ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000'
-    ctx.fillRect(this.x - 12, this.y - 22, 24, 3)
-    ctx.fillStyle = '#333'
-    ctx.fillRect(this.x - 12 + (healthPercent * 24), this.y - 22, (1 - healthPercent) * 24, 3)
+    const barColor = healthPercent > 0.6 ? COLORS.health : healthPercent > 0.3 ? COLORS.money : '#dd2222'
+    ctx.fillStyle = '#111111'
+    ctx.fillRect(this.x - 14, this.y - 24, 28, 5)
+    ctx.strokeStyle = '#666666'
+    ctx.lineWidth = 1
+    ctx.strokeRect(this.x - 14, this.y - 24, 28, 5)
+    ctx.fillStyle = barColor
+    ctx.fillRect(this.x - 13, this.y - 23, (healthPercent * 26), 3)
   }
 }
 

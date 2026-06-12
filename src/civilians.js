@@ -72,35 +72,54 @@ export class Civilian {
     ctx.save()
     ctx.translate(this.x, this.y)
 
-    // Body
-    ctx.fillStyle = this.panicked ? '#ff8888' : '#ffaaaa'
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
     ctx.beginPath()
-    ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2)
+    ctx.ellipse(0, this.size / 2 + 1, this.size / 2, this.size / 4, 0, 0, Math.PI * 2)
     ctx.fill()
+
+    // Body
+    ctx.fillStyle = this.panicked ? '#ff8888' : '#ff9999'
+    ctx.fillRect(-this.size / 2.5, -this.size / 3, this.size / 1.25, this.size / 1.5)
 
     // Head
     ctx.fillStyle = '#ffdd99'
     ctx.beginPath()
-    ctx.arc(0, -this.size / 2, this.size / 3, 0, Math.PI * 2)
+    ctx.arc(0, -this.size / 2.5, this.size / 2.5, 0, Math.PI * 2)
     ctx.fill()
 
-    // Eyes when panicked
+    // Hair
+    ctx.fillStyle = '#dd8833'
+    ctx.fillRect(-this.size / 2, -this.size / 1.8, this.size, this.size / 4)
+
+    // Eyes
+    ctx.fillStyle = '#000000'
     if (this.panicked) {
-      ctx.fillStyle = '#000'
+      // Panic eyes (wide)
+      ctx.fillRect(-4, -this.size / 2.2, 2, 2.5)
+      ctx.fillRect(2, -this.size / 2.2, 2, 2.5)
+      // Panick mouth
+      ctx.strokeStyle = '#000'
+      ctx.lineWidth = 1
       ctx.beginPath()
-      ctx.arc(-3, -this.size / 2 - 1, 1.5, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(3, -this.size / 2 - 1, 1.5, 0, Math.PI * 2)
-      ctx.fill()
+      ctx.arc(0, -this.size / 2.5 + 3, 2, 0, Math.PI)
+      ctx.stroke()
+    } else {
+      // Normal eyes
+      ctx.fillRect(-3, -this.size / 2.2, 1.5, 1.5)
+      ctx.fillRect(1.5, -this.size / 2.2, 1.5, 1.5)
     }
 
     ctx.restore()
 
     // Health bar
-    ctx.fillStyle = '#ff0000'
-    ctx.fillRect(this.x - 8, this.y - 18, 16, 2)
-    ctx.fillStyle = '#00ff00'
-    ctx.fillRect(this.x - 8, this.y - 18, (this.health / this.maxHealth) * 16, 2)
+    const healthPercent = this.health / this.maxHealth
+    ctx.fillStyle = '#111111'
+    ctx.fillRect(this.x - 10, this.y - 18, 20, 4)
+    ctx.strokeStyle = '#666666'
+    ctx.lineWidth = 1
+    ctx.strokeRect(this.x - 10, this.y - 18, 20, 4)
+    ctx.fillStyle = healthPercent > 0.5 ? COLORS.health : '#ffff00'
+    ctx.fillRect(this.x - 9, this.y - 17, (healthPercent * 18), 2)
   }
 }

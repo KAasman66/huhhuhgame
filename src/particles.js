@@ -28,10 +28,27 @@ export class Particle {
     const alpha = this.lifetime / this.maxLifetime
     ctx.save()
     ctx.globalAlpha = alpha
+
+    // Main particle
     ctx.fillStyle = this.color
     ctx.beginPath()
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
     ctx.fill()
+
+    // Particle glow
+    ctx.fillStyle = this.color
+    ctx.globalAlpha = alpha * 0.5
+    ctx.beginPath()
+    ctx.arc(this.x, this.y, this.size * 1.5, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Particle shine
+    ctx.fillStyle = '#ffffff'
+    ctx.globalAlpha = alpha * 0.8
+    ctx.beginPath()
+    ctx.arc(this.x - this.size / 2, this.y - this.size / 2, this.size / 3, 0, Math.PI * 2)
+    ctx.fill()
+
     ctx.restore()
   }
 }

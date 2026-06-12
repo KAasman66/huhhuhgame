@@ -1,16 +1,40 @@
-// Colors
+// Colors - HD Cannon Fodder inspired palette
 export const COLORS = {
-  player: '#00ff00',
-  playerSelected: '#ffff00',
-  enemy: '#ff0000',
-  friendlyBase: '#0088ff',
-  enemyBase: '#ff0000',
-  grass: '#1a4d1a',
-  dirt: '#3d2817',
-  gridLine: '#333333',
-  ui: '#00ff00',
-  money: '#00ff00',
-  health: '#00ff00',
+  // Player squad - bright lime green
+  player: '#22dd00',
+  playerSelected: '#ffff44',
+  playerHeavy: '#00aa00',
+  playerScout: '#ff9944',
+
+  // Enemy - red
+  enemy: '#dd2222',
+  enemyHeavy: '#990000',
+  enemyScout: '#ff6666',
+
+  // Structures
+  friendlyBase: '#0099ff',
+  enemyBase: '#dd2222',
+  tower: '#4488dd',
+  barracks: '#88dd00',
+  factory: '#ffaa00',
+
+  // Terrain
+  grass: '#22aa22',
+  grassDark: '#1a7a1a',
+  dirt: '#5d4422',
+  water: '#2266dd',
+
+  // UI
+  gridLine: '#444444',
+  ui: '#22dd00',
+  money: '#ffff22',
+  health: '#22dd00',
+
+  // Visual effects
+  fireOrange: '#ff6600',
+  fireYellow: '#ffff00',
+  blood: '#dd0000',
+  smoke: '#888888',
 }
 
 // Unit config

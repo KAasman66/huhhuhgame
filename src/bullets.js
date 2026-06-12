@@ -31,16 +31,34 @@ export class Bullet {
 
   render(ctx) {
     ctx.save()
+
+    // Bullet trail effect
+    ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(this.x - this.vx * 5, this.y - this.vy * 5)
+    ctx.lineTo(this.x, this.y)
+    ctx.stroke()
+
+    // Bullet body
     ctx.fillStyle = COLORS.money
     ctx.beginPath()
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.strokeStyle = '#ffff00'
-    ctx.lineWidth = 1
+    // Bullet shine/highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
     ctx.beginPath()
-    ctx.arc(this.x, this.y, this.size + 2, 0, Math.PI * 2)
+    ctx.arc(this.x - this.size / 3, this.y - this.size / 3, this.size / 2, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Bullet glow
+    ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.arc(this.x, this.y, this.size + 1.5, 0, Math.PI * 2)
     ctx.stroke()
+
     ctx.restore()
   }
 
