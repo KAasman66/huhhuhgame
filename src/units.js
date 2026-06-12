@@ -82,23 +82,46 @@ export class Unit {
     ctx.translate(this.x, this.y)
     ctx.rotate(this.angle)
 
+    // Body
     ctx.fillStyle = color
-    ctx.fillRect(-size / 2, -size / 2, size, size)
+    ctx.beginPath()
+    ctx.arc(0, 0, size / 2.2, 0, Math.PI * 2)
+    ctx.fill()
 
-    ctx.fillStyle = '#000'
-    ctx.fillRect(-size / 2 + 2, -size / 2 + 2, size - 4, size - 4)
-
+    // Gun barrel
     ctx.strokeStyle = color
     ctx.lineWidth = 2
-    ctx.strokeRect(-size / 2, -size / 2, size, size)
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.lineTo(size / 2, 0)
+    ctx.stroke()
+
+    // Eyes when selected
+    if (this.selected) {
+      ctx.fillStyle = '#ffff00'
+      ctx.beginPath()
+      ctx.arc(-3, -2, 1.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.arc(3, -2, 1.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    // Highlight border
+    ctx.strokeStyle = this.selected ? '#ffff00' : color
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.arc(0, 0, size / 2.2, 0, Math.PI * 2)
+    ctx.stroke()
 
     ctx.restore()
 
     // Health bar
-    ctx.fillStyle = COLORS.health
-    ctx.fillRect(this.x - 12, this.y - 20, 24, 3)
-    ctx.fillStyle = '#00aa00'
-    ctx.fillRect(this.x - 12, this.y - 20, (this.health / this.maxHealth) * 24, 3)
+    const healthPercent = this.health / this.maxHealth
+    ctx.fillStyle = healthPercent > 0.5 ? '#00ff00' : healthPercent > 0.25 ? '#ffff00' : '#ff0000'
+    ctx.fillRect(this.x - 12, this.y - 22, 24, 3)
+    ctx.fillStyle = '#333'
+    ctx.fillRect(this.x - 12 + (healthPercent * 24), this.y - 22, (1 - healthPercent) * 24, 3)
   }
 }
 

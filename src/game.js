@@ -1,5 +1,6 @@
 import { Squad } from './units.js'
 import { GameMap } from './map.js'
+import { Building } from './buildings.js'
 import { Bullet } from './bullets.js'
 import { Pickup } from './pickups.js'
 import { ParticleEmitter } from './particles.js'
@@ -15,6 +16,7 @@ export class GameState {
     this.bullets = []
     this.pickups = []
     this.particles = []
+    this.buildings = []
     this.money = GAME_CONFIG.startingMoney
     this.mouseX = 0
     this.mouseY = 0
@@ -26,6 +28,9 @@ export class GameState {
 
     this.addEnemyWave()
     this.map.addBuilding(1800, 100, 'base', true)
+    // Add starting defensive towers
+    this.buildings.push(new Building(1700, 300, 'watchtower', true))
+    this.buildings.push(new Building(400, 600, 'watchtower', true))
   }
 
   toggleBuildMenu() {
@@ -95,6 +100,32 @@ export class GameState {
       emitter.update(delta)
     }
 
+    // Update buildings
+    for (const building of this.buildings) {
+      building.update(delta)
+
+      // Building fire at nearby enemies
+      if (building.isPlayer && building.type === 'watchtower') {
+        for (const enemySquad of this.enemies) {
+          for (const enemy of enemySquad.units) {
+            if (!enemy.alive) continue
+            const dx = enemy.x - building.x
+            const dy = enemy.y - building.y
+            const dist = Math.hypot(dx, dy)
+            const fireRange = 300
+
+            if (dist < fireRange && building.canFire()) {
+              building.fire()
+              const angle = Math.atan2(dy, dx)
+              const bulletX = building.x + Math.cos(angle) * building.size / 2
+              const bulletY = building.y + Math.sin(angle) * building.size / 2
+              this.bullets.push(new Bullet(bulletX, bulletY, angle))
+            }
+          }
+        }
+      }
+    }
+
     // Pickup collection
     for (const unit of this.squad.units) {
       if (!unit.alive) continue
@@ -160,6 +191,23 @@ export class GameState {
       }
     }
 
+    // Bullet vs building collision
+    for (const bullet of this.bullets) {
+      if (!bullet.alive) continue
+
+      for (const building of this.buildings) {
+        if (!building.alive) continue
+        const dx = bullet.x - building.x
+        const dy = bullet.y - building.y
+        const dist = Math.hypot(dx, dy)
+        if (dist < building.size / 2 + bullet.size) {
+          building.takeDamage(bullet.damage)
+          bullet.alive = false
+          break
+        }
+      }
+    }
+
     // Bullet vs player collision (friendly fire!)
     for (const bullet of this.bullets) {
       if (!bullet.alive) continue
@@ -196,10 +244,11 @@ export class GameState {
       }
     }
 
-    // Remove dead bullets, pickups, and particles
+    // Remove dead bullets, pickups, particles, and buildings
     this.bullets = this.bullets.filter(b => b.alive)
     this.pickups = this.pickups.filter(p => p.alive)
     this.particles = this.particles.filter(e => !e.isDead())
+    this.buildings = this.buildings.filter(b => b.alive)
 
     // Remove dead enemy squads
     this.enemies = this.enemies.filter(squad => squad.getAliveCount() > 0)
@@ -213,6 +262,11 @@ export class GameState {
   render(ctx) {
     this.map.render(ctx)
     this.squad.render(ctx)
+
+    // Render buildings
+    for (const building of this.buildings) {
+      if (building.alive) building.render(ctx)
+    }
 
     for (const enemySquad of this.enemies) {
       enemySquad.render(ctx)
