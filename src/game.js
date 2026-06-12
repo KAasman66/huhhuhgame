@@ -565,19 +565,46 @@ export class GameState {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)'
     ctx.fillRect(0, 0, this.width, this.height)
 
-    ctx.fillStyle = '#00ff00'
-    ctx.font = 'bold 48px Arial'
-    ctx.textAlign = 'center'
-    ctx.fillText('LEVEL COMPLETE!', this.width / 2, 200)
+    // Victory animation effect
+    const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7
+    ctx.fillStyle = `rgba(0, 255, 0, ${pulse * 0.3})`
+    ctx.fillRect(0, 0, this.width, this.height)
 
-    ctx.font = '24px Arial'
+    ctx.fillStyle = '#00ff00'
+    ctx.font = 'bold 64px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText('LEVEL COMPLETE!', this.width / 2, 150)
+
+    ctx.font = '28px Arial'
+    ctx.fillStyle = '#ffff00'
+    ctx.fillText(`${this.levelConfig.name}`, this.width / 2, 220)
+
+    ctx.font = '22px Arial'
     ctx.fillStyle = COLORS.ui
-    ctx.fillText(`Waves Survived: ${this.waveCount - 1}`, this.width / 2, 280)
-    ctx.fillText(`Enemies Killed: ${this.kills}`, this.width / 2, 330)
-    ctx.fillText(`Reward: $${this.money}`, this.width / 2, 380)
+    let y = 300
+    ctx.fillText(`Waves Survived: ${this.waveCount - 1}`, this.width / 2, y)
+    y += 50
+    ctx.fillText(`Enemies Killed: ${this.kills} x 100 = $${this.kills * 100}`, this.width / 2, y)
+    y += 50
+    ctx.fillText(`Civilians Rescued: ${this.rescued} x 500 = $${this.rescued * 500}`, this.width / 2, y)
+    y += 50
+
+    const speedBonus = this.waveCount > 5 ? 1000 : 0
+    if (speedBonus > 0) {
+      ctx.fillStyle = '#ffff00'
+      ctx.fillText(`Speed Bonus: $${speedBonus}`, this.width / 2, y)
+      ctx.fillStyle = COLORS.ui
+      y += 50
+    }
+
+    const totalReward = (this.kills * 100) + (this.rescued * 500) + this.money + speedBonus
+    ctx.fillStyle = '#00ff00'
+    ctx.font = 'bold 28px Arial'
+    ctx.fillText(`Total Reward: $${totalReward}`, this.width / 2, y + 30)
 
     ctx.font = '18px Arial'
-    ctx.fillText('Press R to restart or E for next level', this.width / 2, 480)
+    ctx.fillStyle = '#ffff00'
+    ctx.fillText(`Press E for next level or R to restart`, this.width / 2, this.height - 80)
     ctx.textAlign = 'left'
   }
 
