@@ -1,9 +1,25 @@
 import { RNG } from '../core/math'
+import { art, Sprite } from '../core/art'
 
 export const TILE = 30
 
+interface Lake {
+  x: number
+  y: number
+  rx: number
+  ry: number
+}
+
+interface Layout {
+  roadY: number
+  lakes: Lake[]
+  patches: { x: number; y: number; r: number; ry: number; rot: number }[]
+  trees: { x: number; y: number }[]
+}
+
 /**
  * Procedurally generated battlefield, rendered once into an offscreen canvas.
+ * Uses the AI-generated tileset when available, procedural drawing otherwise.
  * A second canvas holds permanent decals: blood, craters, scorch marks and
  * corpses. War leaves traces.
  */
@@ -43,8 +59,158 @@ export class Terrain {
   private generate(seed: number) {
     const rng = new RNG(seed)
     const ctx = this.base.getContext('2d')!
+    const layout = this.computeLayout(rng)
 
-    // Grass base: two-tone checker with speckles
+    const useArt = art.ready && art.tiles.grass.length > 0
+    if (useArt) this.paintWithTiles(ctx, rng, layout)
+    else this.paintProcedural(ctx, rng, layout)
+
+    this.markBlocked(layout)
+  }
+
+  private computeLayout(rng: RNG): Layout {
+    const roadY = rng.range(this.h * 0.35, this.h * 0.65)
+
+    const patches: Layout['patches'] = []
+    for (let i = 0; i < 24; i++) {
+      patches.push({
+        x: rng.range(0, this.w),
+        y: rng.range(0, this.h),
+        r: rng.range(25, 70),
+        ry: rng.range(0.5, 0.9),
+        rot: rng.range(0, Math.PI),
+      })
+    }
+
+    const lakes: Lake[] = []
+    const lakeCount = rng.int(1, 2)
+    for (let i = 0; i < lakeCount; i++) {
+      lakes.push({
+        x: rng.range(this.w * 0.3, this.w * 0.7),
+        y: rng.chance(0.5) ? rng.range(120, this.h * 0.28) : rng.range(this.h * 0.72, this.h - 120),
+        rx: rng.range(90, 170),
+        ry: rng.range(60, 110),
+      })
+    }
+
+    const trees: Layout['trees'] = []
+    for (let i = 0; i < 55; i++) {
+      const x = rng.range(40, this.w - 40)
+      const y = rng.range(40, this.h - 40)
+      if (Math.abs(y - this.roadYAt(roadY, x)) < 80) continue
+      if (lakes.some((l) => ((x - l.x) / (l.rx + 30)) ** 2 + ((y - l.y) / (l.ry + 30)) ** 2 < 1)) continue
+      trees.push({ x, y })
+    }
+
+    return { roadY, lakes, patches, trees }
+  }
+
+  private roadYAt(roadY: number, x: number): number {
+    return roadY + Math.sin(x * 0.004) * 60
+  }
+
+  private markBlocked(layout: Layout) {
+    for (const l of layout.lakes) {
+      for (let cy = 0; cy < this.rows; cy++) {
+        for (let cx = 0; cx < this.cols; cx++) {
+          const px = cx * TILE + TILE / 2
+          const py = cy * TILE + TILE / 2
+          if (((px - l.x) / l.rx) ** 2 + ((py - l.y) / l.ry) ** 2 < 1) {
+            this.blocked[this.cellIdx(cx, cy)] = 1
+            this.water[this.cellIdx(cx, cy)] = 1
+          }
+        }
+      }
+    }
+    for (const t of layout.trees) {
+      const cx = Math.floor(t.x / TILE)
+      const cy = Math.floor(t.y / TILE)
+      if (this.blocked[this.cellIdx(cx, cy)]) continue
+      this.trees.push(t)
+      this.blocked[this.cellIdx(cx, cy)] = 1
+    }
+  }
+
+  // -- AI tileset painting ------------------------------------------------
+
+  private paintWithTiles(ctx: CanvasRenderingContext2D, rng: RNG, layout: Layout) {
+    const T = 120
+    const tiles = art.tiles
+    const pickGrass = (): Sprite => (rng.chance(0.85) ? tiles.grass[rng.int(0, 2)] : tiles.grass[rng.int(3, tiles.grass.length - 1)])
+
+    for (let y = 0; y < this.h; y += T) {
+      for (let x = 0; x < this.w; x += T) {
+        ctx.drawImage(pickGrass().c, x, y, T, T)
+      }
+    }
+
+    const dirt = () => tiles.dirt[rng.int(0, tiles.dirt.length - 1)]
+
+    // Dirt patches: clipped ellipses filled with dirt tile
+    for (const p of layout.patches) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.ellipse(p.x, p.y, p.r, p.r * p.ry, p.rot, 0, Math.PI * 2)
+      ctx.clip()
+      ctx.globalAlpha = 0.85
+      ctx.drawImage(dirt().c, p.x - p.r - 10, p.y - p.r - 10, (p.r + 10) * 2, (p.r + 10) * 2)
+      ctx.restore()
+    }
+
+    // Winding dirt road
+    for (let x = -40; x < this.w + 40; x += 48) {
+      const yy = this.roadYAt(layout.roadY, x)
+      ctx.save()
+      ctx.beginPath()
+      ctx.ellipse(x, yy, 48, 34, 0, 0, Math.PI * 2)
+      ctx.clip()
+      ctx.drawImage(dirt().c, x - 60, yy - 60, 120, 120)
+      ctx.restore()
+    }
+    ctx.fillStyle = 'rgba(220,200,150,0.35)'
+    for (let x = 0; x < this.w; x += 38) {
+      const yy = this.roadYAt(layout.roadY, x)
+      ctx.fillRect(x, yy - 2, 20, 3)
+    }
+
+    // Lakes: water tile in ellipse clip + shore ring
+    for (const l of layout.lakes) {
+      ctx.fillStyle = '#9a8a55'
+      ctx.beginPath()
+      ctx.ellipse(l.x, l.y, l.rx + 8, l.ry + 8, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.save()
+      ctx.beginPath()
+      ctx.ellipse(l.x, l.y, l.rx, l.ry, 0, 0, Math.PI * 2)
+      ctx.clip()
+      const wt = tiles.water[0]
+      for (let y = l.y - l.ry; y < l.y + l.ry; y += 150) {
+        for (let x = l.x - l.rx; x < l.x + l.rx; x += 150) {
+          ctx.drawImage(wt.c, x, y, 150, 150)
+        }
+      }
+      ctx.restore()
+    }
+
+    // Tree groves: clipped circles of the forest tile
+    for (const t of layout.trees) {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'
+      ctx.beginPath()
+      ctx.ellipse(t.x + 5, t.y + 7, 20, 9, 0, 0, Math.PI * 2)
+      ctx.fill()
+      const f = tiles.forest[rng.int(0, tiles.forest.length - 1)]
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(t.x, t.y, 24, 0, Math.PI * 2)
+      ctx.clip()
+      ctx.drawImage(f.c, t.x - 32, t.y - 32, 64, 64)
+      ctx.restore()
+    }
+  }
+
+  // -- Procedural fallback painting ---------------------------------------
+
+  private paintProcedural(ctx: CanvasRenderingContext2D, rng: RNG, layout: Layout) {
     for (let cy = 0; cy < this.rows; cy++) {
       for (let cx = 0; cx < this.cols; cx++) {
         const light = (cx + cy) % 2 === 0
@@ -57,89 +223,51 @@ export class Terrain {
       }
     }
 
-    // Dirt patches
     ctx.globalAlpha = 0.5
-    for (let i = 0; i < 26; i++) {
-      const x = rng.range(0, this.w)
-      const y = rng.range(0, this.h)
-      const r = rng.range(20, 70)
-      ctx.fillStyle = '#6b5226'
+    ctx.fillStyle = '#6b5226'
+    for (const p of layout.patches) {
       ctx.beginPath()
-      ctx.ellipse(x, y, r, r * rng.range(0.5, 0.9), rng.range(0, Math.PI), 0, Math.PI * 2)
+      ctx.ellipse(p.x, p.y, p.r, p.r * p.ry, p.rot, 0, Math.PI * 2)
       ctx.fill()
     }
     ctx.globalAlpha = 1
 
-    // Horizontal dirt road across the map
-    const roadY = rng.range(this.h * 0.35, this.h * 0.65)
     ctx.fillStyle = '#7a6233'
     for (let x = 0; x < this.w; x += 10) {
-      const yy = roadY + Math.sin(x * 0.004) * 60
-      ctx.fillRect(x, yy - 26, 10, 52)
+      ctx.fillRect(x, this.roadYAt(layout.roadY, x) - 26, 10, 52)
     }
     ctx.fillStyle = '#8d7440'
     for (let x = 0; x < this.w; x += 38) {
-      const yy = roadY + Math.sin(x * 0.004) * 60
-      ctx.fillRect(x, yy - 2, 20, 4)
+      ctx.fillRect(x, this.roadYAt(layout.roadY, x) - 2, 20, 4)
     }
 
-    // Lakes (avoid spawn corners: left-center and right-center kept clear)
-    const lakes = rng.int(1, 2)
-    for (let i = 0; i < lakes; i++) {
-      const lx = rng.range(this.w * 0.3, this.w * 0.7)
-      const ly = rng.chance(0.5) ? rng.range(120, this.h * 0.28) : rng.range(this.h * 0.72, this.h - 120)
-      const rx = rng.range(90, 170)
-      const ry = rng.range(60, 110)
-      // Shore
+    for (const l of layout.lakes) {
       ctx.fillStyle = '#9a8a55'
       ctx.beginPath()
-      ctx.ellipse(lx, ly, rx + 8, ry + 8, 0, 0, Math.PI * 2)
+      ctx.ellipse(l.x, l.y, l.rx + 8, l.ry + 8, 0, 0, Math.PI * 2)
       ctx.fill()
       ctx.fillStyle = '#2b5d8a'
       ctx.beginPath()
-      ctx.ellipse(lx, ly, rx, ry, 0, 0, Math.PI * 2)
+      ctx.ellipse(l.x, l.y, l.rx, l.ry, 0, 0, Math.PI * 2)
       ctx.fill()
       ctx.fillStyle = '#3a72a5'
       ctx.beginPath()
-      ctx.ellipse(lx - rx * 0.15, ly - ry * 0.2, rx * 0.6, ry * 0.55, 0, 0, Math.PI * 2)
+      ctx.ellipse(l.x - l.rx * 0.15, l.y - l.ry * 0.2, l.rx * 0.6, l.ry * 0.55, 0, 0, Math.PI * 2)
       ctx.fill()
-      // Mark blocked cells
-      for (let cy = 0; cy < this.rows; cy++) {
-        for (let cx = 0; cx < this.cols; cx++) {
-          const px = cx * TILE + TILE / 2
-          const py = cy * TILE + TILE / 2
-          const dx = (px - lx) / rx
-          const dy = (py - ly) / ry
-          if (dx * dx + dy * dy < 1) {
-            this.blocked[this.cellIdx(cx, cy)] = 1
-            this.water[this.cellIdx(cx, cy)] = 1
-          }
-        }
-      }
     }
 
-    // Trees: blocked circles with shadow + canopy
-    for (let i = 0; i < 55; i++) {
-      const x = rng.range(40, this.w - 40)
-      const y = rng.range(40, this.h - 40)
-      if (Math.abs(y - roadY) < 80) continue
-      const cx = Math.floor(x / TILE)
-      const cy = Math.floor(y / TILE)
-      if (this.blocked[this.cellIdx(cx, cy)]) continue
-      this.trees.push({ x, y })
-      this.blocked[this.cellIdx(cx, cy)] = 1
-
+    for (const t of layout.trees) {
       ctx.fillStyle = 'rgba(0,0,0,0.25)'
       ctx.beginPath()
-      ctx.ellipse(x + 5, y + 6, 14, 6, 0, 0, Math.PI * 2)
+      ctx.ellipse(t.x + 5, t.y + 6, 14, 6, 0, 0, Math.PI * 2)
       ctx.fill()
       ctx.fillStyle = '#4a3318'
-      ctx.fillRect(x - 2, y - 2, 4, 8)
+      ctx.fillRect(t.x - 2, t.y - 2, 4, 8)
       const greens = ['#1e4d17', '#266018', '#2d6e1d']
       for (let b = 0; b < 5; b++) {
         ctx.fillStyle = greens[b % greens.length]
         ctx.beginPath()
-        ctx.arc(x + rng.range(-7, 7), y - 6 + rng.range(-6, 6), rng.range(6, 11), 0, Math.PI * 2)
+        ctx.arc(t.x + rng.range(-7, 7), t.y - 6 + rng.range(-6, 6), rng.range(6, 11), 0, Math.PI * 2)
         ctx.fill()
       }
     }
@@ -205,19 +333,15 @@ export class Terrain {
     c.save()
     c.translate(x, y)
     c.rotate(angle)
-    // Blood pool
     c.fillStyle = 'rgba(110,6,6,0.6)'
     c.beginPath()
     c.ellipse(0, 0, 13, 9, 0, 0, Math.PI * 2)
     c.fill()
-    // Body sprawled
     c.fillStyle = uniform
     c.fillRect(-6, -3, 12, 6)
-    c.fillStyle = uniform
-    c.fillRect(-9, -5, 4, 3) // arm
-    c.fillRect(4, 2, 5, 3) // arm
-    c.fillRect(-8, 1, 4, 3) // leg
-    // Head
+    c.fillRect(-9, -5, 4, 3)
+    c.fillRect(4, 2, 5, 3)
+    c.fillRect(-8, 1, 4, 3)
     c.fillStyle = '#d8b894'
     c.beginPath()
     c.arc(8, -1, 3.2, 0, Math.PI * 2)

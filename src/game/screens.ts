@@ -3,6 +3,7 @@ import { VIEW_W, VIEW_H } from './game'
 import { MISSIONS } from './missions'
 import { loadGraves, rankName } from './roster'
 import { music } from '../core/audio'
+import { art } from '../core/art'
 
 const FONT = "'Courier New', monospace"
 
@@ -34,42 +35,57 @@ function scanlines(ctx: CanvasRenderingContext2D, t: number) {
 
 function drawTitle(g: Game, ctx: CanvasRenderingContext2D) {
   const t = g.time
-  // Background: night battlefield gradient
-  const grad = ctx.createLinearGradient(0, 0, 0, VIEW_H)
-  grad.addColorStop(0, '#0a0f08')
-  grad.addColorStop(0.7, '#15200f')
-  grad.addColorStop(1, '#070a05')
-  ctx.fillStyle = grad
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H)
 
-  // Distant explosions
-  for (let i = 0; i < 3; i++) {
-    const phase = (t * 0.5 + i * 1.7) % 5
-    if (phase < 0.3) {
-      const x = ((i * 467 + Math.floor(t / 5) * 131) % VIEW_W)
-      const y = VIEW_H * 0.62
-      ctx.fillStyle = `rgba(255,150,50,${(0.3 - phase) * 1.6})`
-      ctx.beginPath()
-      ctx.arc(x, y, 30 + phase * 120, 0, Math.PI * 2)
-      ctx.fill()
+  if (art.title) {
+    // AI key art: cover-fit the panorama, centered
+    const scale = Math.max(VIEW_W / art.title.w, VIEW_H / art.title.h)
+    const dw = art.title.w * scale
+    const dh = art.title.h * scale
+    ctx.drawImage(art.title.c, (VIEW_W - dw) / 2, (VIEW_H - dh) / 2, dw, dh)
+    // Darken top and bottom so text stays readable
+    const g1 = ctx.createLinearGradient(0, 0, 0, VIEW_H)
+    g1.addColorStop(0, 'rgba(0,0,0,0.55)')
+    g1.addColorStop(0.32, 'rgba(0,0,0,0.1)')
+    g1.addColorStop(0.55, 'rgba(0,0,0,0.25)')
+    g1.addColorStop(1, 'rgba(0,0,0,0.7)')
+    ctx.fillStyle = g1
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+  } else {
+    // Procedural fallback background
+    const grad = ctx.createLinearGradient(0, 0, 0, VIEW_H)
+    grad.addColorStop(0, '#0a0f08')
+    grad.addColorStop(0.7, '#15200f')
+    grad.addColorStop(1, '#070a05')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+
+    for (let i = 0; i < 3; i++) {
+      const phase = (t * 0.5 + i * 1.7) % 5
+      if (phase < 0.3) {
+        const x = ((i * 467 + Math.floor(t / 5) * 131) % VIEW_W)
+        const y = VIEW_H * 0.62
+        ctx.fillStyle = `rgba(255,150,50,${(0.3 - phase) * 1.6})`
+        ctx.beginPath()
+        ctx.arc(x, y, 30 + phase * 120, 0, Math.PI * 2)
+        ctx.fill()
+      }
     }
-  }
 
-  // Horizon + marching silhouettes
-  ctx.fillStyle = '#050804'
-  ctx.fillRect(0, VIEW_H * 0.65, VIEW_W, VIEW_H * 0.35)
-  ctx.fillStyle = '#020302'
-  for (let i = 0; i < 9; i++) {
-    const x = ((i * 170 + t * 26) % (VIEW_W + 120)) - 60
-    const y = VIEW_H * 0.65
-    const step = Math.sin(t * 7 + i) * 3
-    ctx.fillRect(x - 4, y - 22, 8, 16)
-    ctx.beginPath()
-    ctx.arc(x, y - 26, 4.5, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.fillRect(x - 5, y - 8, 3, 8 + step)
-    ctx.fillRect(x + 2, y - 8, 3, 8 - step)
-    ctx.fillRect(x + 2, y - 20, 12, 2.5) // rifle
+    ctx.fillStyle = '#050804'
+    ctx.fillRect(0, VIEW_H * 0.65, VIEW_W, VIEW_H * 0.35)
+    ctx.fillStyle = '#020302'
+    for (let i = 0; i < 9; i++) {
+      const x = ((i * 170 + t * 26) % (VIEW_W + 120)) - 60
+      const y = VIEW_H * 0.65
+      const step = Math.sin(t * 7 + i) * 3
+      ctx.fillRect(x - 4, y - 22, 8, 16)
+      ctx.beginPath()
+      ctx.arc(x, y - 26, 4.5, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillRect(x - 5, y - 8, 3, 8 + step)
+      ctx.fillRect(x + 2, y - 8, 3, 8 - step)
+      ctx.fillRect(x + 2, y - 20, 12, 2.5) // rifle
+    }
   }
 
   // Title

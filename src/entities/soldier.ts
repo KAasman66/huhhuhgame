@@ -1,4 +1,5 @@
 import { angleTo, clamp, dist, rnd } from '../core/math'
+import { art } from '../core/art'
 import type { Side } from './projectile'
 
 export const RANKS = ['PVT', 'CPL', 'SGT', 'CPT'] as const
@@ -121,33 +122,38 @@ export class Soldier {
     ctx.translate(x, y)
     ctx.rotate(this.angle + Math.PI / 2)
 
-    // Legs (march animation)
-    const leg = this.moving ? Math.sin(this.walkPhase) * 3.5 : 0
-    ctx.fillStyle = '#2e2e22'
-    ctx.fillRect(-4, 2 - leg, 3, 5)
-    ctx.fillRect(1, 2 + leg, 3, 5)
-
-    // Body
-    ctx.fillStyle = this.colors.uniform
-    ctx.fillRect(-5, -5, 10, 9)
-    // Webbing strap
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'
-    ctx.fillRect(-5, -2, 10, 2)
-
-    // Rifle pointing forward
-    ctx.fillStyle = '#26221a'
-    ctx.fillRect(2, -12, 2.5, 9)
-
-    // Head + helmet
-    ctx.fillStyle = '#d8b894'
-    ctx.beginPath()
-    ctx.arc(0, -4, 3.6, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.fillStyle = this.colors.helmet
-    ctx.beginPath()
-    ctx.arc(0, -4.6, 3.8, Math.PI, Math.PI * 2)
-    ctx.fill()
-    ctx.fillRect(-3.8, -4.8, 7.6, 1.6)
+    const poses = this.side === 'player' ? art.soldierPoses.player : art.soldierPoses.enemy
+    if (poses.length >= 3) {
+      // AI sprite: pick pose (walk cycle / idle / firing)
+      const justFired = this.fireCd > this.fireInterval() * 0.5
+      let sp = poses[2]
+      if (justFired) sp = poses[poses.length - 1]
+      else if (this.moving) sp = poses[Math.floor(this.walkPhase * 1.4) % 2]
+      const h = 26
+      const w = (h * sp.w) / sp.h
+      ctx.drawImage(sp.c, -w / 2, -h / 2, w, h)
+    } else {
+      // Procedural fallback
+      const leg = this.moving ? Math.sin(this.walkPhase) * 3.5 : 0
+      ctx.fillStyle = '#2e2e22'
+      ctx.fillRect(-4, 2 - leg, 3, 5)
+      ctx.fillRect(1, 2 + leg, 3, 5)
+      ctx.fillStyle = this.colors.uniform
+      ctx.fillRect(-5, -5, 10, 9)
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'
+      ctx.fillRect(-5, -2, 10, 2)
+      ctx.fillStyle = '#26221a'
+      ctx.fillRect(2, -12, 2.5, 9)
+      ctx.fillStyle = '#d8b894'
+      ctx.beginPath()
+      ctx.arc(0, -4, 3.6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = this.colors.helmet
+      ctx.beginPath()
+      ctx.arc(0, -4.6, 3.8, Math.PI, Math.PI * 2)
+      ctx.fill()
+      ctx.fillRect(-3.8, -4.8, 7.6, 1.6)
+    }
 
     ctx.restore()
 

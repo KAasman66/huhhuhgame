@@ -1,4 +1,5 @@
 import { angleTo, dist } from '../core/math'
+import { art } from '../core/art'
 import type { Side } from './projectile'
 import type { BlockTest } from './soldier'
 
@@ -114,6 +115,27 @@ export class Vehicle {
     ctx.ellipse(x + 3, y + 4, s * 0.65, s * 0.3, 0, 0, Math.PI * 2)
     ctx.fill()
 
+    // AI sprite path (sprite faces up; length runs along travel direction)
+    const sp =
+      this.type === 'jeep'
+        ? friendly
+          ? art.vehicles.jeepPlayer
+          : art.vehicles.jeepEnemy
+        : friendly
+          ? art.vehicles.tankPlayer
+          : art.vehicles.tankEnemy
+    if (sp) {
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.rotate(this.angle + Math.PI / 2)
+      const len = this.type === 'tank' ? 48 : 38
+      const w = (len * sp.w) / sp.h
+      ctx.drawImage(sp.c, -w / 2, -len / 2, w, len)
+      ctx.restore()
+      this.renderOverlays(ctx)
+      return
+    }
+
     ctx.save()
     ctx.translate(x, y)
     ctx.rotate(this.angle)
@@ -179,8 +201,13 @@ export class Vehicle {
       ctx.fill()
     }
     ctx.restore()
+    this.renderOverlays(ctx)
+  }
 
-    // Occupied marker
+  private renderOverlays(ctx: CanvasRenderingContext2D) {
+    const { x, y } = this
+    const s = this.stats.size
+
     if (this.occupied) {
       ctx.fillStyle = '#ffe14a'
       ctx.beginPath()

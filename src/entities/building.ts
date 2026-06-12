@@ -1,3 +1,4 @@
+import { art } from '../core/art'
 import type { Side } from './projectile'
 
 export type BuildingType = 'tower' | 'barracks' | 'factory' | 'hq' | 'spawner' | 'etower'
@@ -67,6 +68,16 @@ export class Building {
     ctx.beginPath()
     ctx.ellipse(x + 4, y + half * 0.8, half * 1.1, half * 0.35, 0, 0, Math.PI * 2)
     ctx.fill()
+
+    // AI sprite path
+    const sp = art.buildings[this.type]
+    if (sp) {
+      const w = size * 1.45
+      const h = (w * sp.h) / sp.w
+      ctx.drawImage(sp.c, x - w / 2, y - h * 0.58, w, h)
+      this.renderHpBar(ctx)
+      return
+    }
 
     if (this.type === 'tower' || this.type === 'etower') {
       // Concrete base
@@ -151,13 +162,17 @@ export class Building {
       }
     }
 
-    // Health bar when damaged
-    if (this.hp < this.maxHp) {
-      const p = this.hp / this.maxHp
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'
-      ctx.fillRect(x - half, y - half - 10, size, 4)
-      ctx.fillStyle = p > 0.5 ? '#4dd34d' : p > 0.25 ? '#ffd24a' : '#ff5040'
-      ctx.fillRect(x - half + 0.5, y - half - 9.5, (size - 1) * p, 3)
-    }
+    this.renderHpBar(ctx)
+  }
+
+  private renderHpBar(ctx: CanvasRenderingContext2D) {
+    if (this.hp >= this.maxHp) return
+    const { x, y, size } = this
+    const half = size / 2
+    const p = this.hp / this.maxHp
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'
+    ctx.fillRect(x - half, y - half - 10, size, 4)
+    ctx.fillStyle = p > 0.5 ? '#4dd34d' : p > 0.25 ? '#ffd24a' : '#ff5040'
+    ctx.fillRect(x - half + 0.5, y - half - 9.5, (size - 1) * p, 3)
   }
 }
