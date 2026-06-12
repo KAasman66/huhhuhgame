@@ -47,8 +47,8 @@ export class Unit {
   }
 
   clampPosition() {
-    this.x = Math.max(this.size / 2, Math.min(1280 - this.size / 2, this.x))
-    this.y = Math.max(this.size / 2, Math.min(720 - this.size / 2, this.y))
+    this.x = Math.max(this.size / 2, Math.min(2000 - this.size / 2, this.x))
+    this.y = Math.max(this.size / 2, Math.min(1200 - this.size / 2, this.y))
   }
 
   moveTo(x, y) {
