@@ -4,6 +4,7 @@ import { Building } from './buildings.js'
 import { Vehicle } from './vehicles.js'
 import { Bullet } from './bullets.js'
 import { Pickup } from './pickups.js'
+import { Civilian } from './civilians.js'
 import { ParticleEmitter } from './particles.js'
 import { SoundFX } from './audio.js'
 import { GAME_CONFIG, COLORS } from './assets.js'
@@ -21,6 +22,8 @@ export class GameState {
     this.particles = []
     this.buildings = []
     this.vehicles = []
+    this.civilians = []
+    this.rescued = 0
     this.money = GAME_CONFIG.startingMoney
 
     // Campaign system
@@ -30,6 +33,7 @@ export class GameState {
     this.level = this.currentLevel
     this.levelComplete = false
     this.levelFailed = false
+    this.gameStarted = false
     this.mouseX = 0
     this.mouseY = 0
     this.buildMenuOpen = false
@@ -38,11 +42,27 @@ export class GameState {
     this.waveCount = 0
     this.kills = 0
 
+    // Load level
+    this.loadLevel()
+
     this.addEnemyWave()
     this.map.addBuilding(1800, 100, 'base', true)
     // Add starting defensive towers
     this.buildings.push(new Building(1700, 300, 'watchtower', true))
     this.buildings.push(new Building(400, 600, 'watchtower', true))
+  }
+
+  loadLevel() {
+    // Spawn civilians in certain levels
+    if (this.levelConfig.id >= 2 && this.levelConfig.id <= 4) {
+      for (let i = 0; i < 3; i++) {
+        this.civilians.push(new Civilian(
+          Math.random() * 1500 + 250,
+          Math.random() * 1000 + 100
+        ))
+      }
+    }
+  }
   }
 
   toggleBuildMenu() {
@@ -80,6 +100,10 @@ export class GameState {
       alert('All levels complete! Well done!')
       location.reload()
     }
+  }
+
+  startGame() {
+    this.gameStarted = true
   }
 
   handleKeyA() {
@@ -237,6 +261,40 @@ export class GameState {
     // Update vehicles
     for (const vehicle of this.vehicles) {
       vehicle.update(delta)
+    }
+
+    // Update civilians
+    for (const civilian of this.civilians) {
+      civilian.update(delta)
+    }
+
+    // Civilian rescue mechanic (close to squad)
+    for (const civilian of this.civilians) {
+      if (civilian.alive && !civilian.rescued) {
+        const dx = civilian.x - this.squad.selectedUnit.x
+        const dy = civilian.y - this.squad.selectedUnit.y
+        const dist = Math.hypot(dx, dy)
+
+        if (dist < 60) {
+          civilian.rescue()
+          this.rescued++
+          this.money += 500
+          SoundFX.powerup()
+        }
+      }
+    }
+
+    // Civilian damage from bullets
+    for (const bullet of this.bullets) {
+      if (!bullet.alive) continue
+      for (const civilian of this.civilians) {
+        if (!civilian.alive || civilian.rescued) continue
+        if (Math.hypot(bullet.x - civilian.x, bullet.y - civilian.y) < civilian.size + bullet.size) {
+          civilian.takeDamage(bullet.damage * 0.5)
+          bullet.alive = false
+          break
+        }
+      }
     }
 
     // Pickup collection
@@ -401,12 +459,13 @@ export class GameState {
       }
     }
 
-    // Remove dead bullets, pickups, particles, buildings, and vehicles
+    // Remove dead bullets, pickups, particles, buildings, vehicles, and civiliaans
     this.bullets = this.bullets.filter(b => b.alive)
     this.pickups = this.pickups.filter(p => p.alive)
     this.particles = this.particles.filter(e => !e.isDead())
     this.buildings = this.buildings.filter(b => b.alive)
     this.vehicles = this.vehicles.filter(v => v.alive)
+    this.civilians = this.civilians.filter(c => c.alive || c.rescued)
 
     // Remove dead enemy squads/vehicles
     this.enemies = this.enemies.filter(e => {
@@ -443,6 +502,11 @@ export class GameState {
   }
 
   render(ctx) {
+    if (!this.gameStarted) {
+      this.renderStartScreen(ctx)
+      return
+    }
+
     this.map.render(ctx)
     this.squad.render(ctx)
 
@@ -454,6 +518,11 @@ export class GameState {
     // Render vehicles
     for (const vehicle of this.vehicles) {
       if (vehicle.alive) vehicle.render(ctx)
+    }
+
+    // Render civilians
+    for (const civilian of this.civilians) {
+      if (civilian.alive) civilian.render(ctx)
     }
 
     for (const enemySquad of this.enemies) {
@@ -531,14 +600,59 @@ export class GameState {
     ctx.textAlign = 'left'
   }
 
+  renderStartScreen(ctx) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.95)'
+    ctx.fillRect(0, 0, this.width, this.height)
+
+    // Background animation
+    for (let i = 0; i < 20; i++) {
+      const x = (Math.sin(Date.now() / 1000 + i) * 100 + 1000) % this.width
+      const y = ((i * 60 + Date.now() / 20) % this.height)
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.1)'
+      ctx.fillRect(x, y, 50, 20)
+    }
+
+    ctx.fillStyle = '#00ff00'
+    ctx.font = 'bold 72px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText('TACTICAL CHAOS', this.width / 2, 150)
+
+    ctx.font = '32px Arial'
+    ctx.fillStyle = '#ffff00'
+    ctx.fillText(`Level ${this.level}: ${this.levelConfig.name}`, this.width / 2, 250)
+
+    ctx.font = '20px Arial'
+    ctx.fillStyle = COLORS.ui
+    const desc = this.levelConfig.description
+    ctx.fillText(desc, this.width / 2, 320)
+
+    ctx.font = '18px Arial'
+    ctx.fillStyle = '#aaffaa'
+    ctx.fillText('OBJECTIVES:', this.width / 2, 400)
+    ctx.font = '16px Arial'
+    for (let i = 0; i < this.levelConfig.objectives.length; i++) {
+      ctx.fillText(`• ${this.levelConfig.objectives[i]}`, this.width / 2, 440 + i * 30)
+    }
+
+    ctx.font = '20px Arial'
+    ctx.fillStyle = '#ffff00'
+    ctx.fillText('Press SPACE to start', this.width / 2, 650)
+
+    ctx.font = '14px Arial'
+    ctx.fillStyle = '#888888'
+    ctx.fillText('Controls: A=Move | D=Defend | S=Spread | E=Build | SPACE=Jeep | SHIFT=Tank', this.width / 2, 720)
+
+    ctx.textAlign = 'left'
+  }
+
   renderHUD(ctx) {
     const totalEnemies = this.enemies.reduce((sum, sq) => {
       if (sq instanceof Squad) return sum + sq.getAliveCount()
       return sum + (sq.alive ? 1 : 0)
     }, 0)
 
-    document.getElementById('money').textContent = `Level ${this.level} | Cash: $${this.money} | Wave: ${this.waveCount}`
-    document.getElementById('units').textContent = `Squad: ${this.squad.getAliveCount()}/${this.squad.units.length} | Vehicles: ${this.vehicles.length} | Enemies: ${totalEnemies}`
+    document.getElementById('money').textContent = `Level ${this.level} | Cash: $${this.money} | Kills: ${this.kills} | Rescued: ${this.rescued}`
+    document.getElementById('units').textContent = `Squad: ${this.squad.getAliveCount()}/${this.squad.units.length} | Vehicles: ${this.vehicles.length} | Enemies: ${totalEnemies} | Wave: ${this.waveCount}`
   }
 
   renderBuildMenu(ctx) {

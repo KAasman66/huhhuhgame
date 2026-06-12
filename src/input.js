@@ -22,10 +22,12 @@ export function initInput(game, canvas) {
       if (e.key === '3') selectedBuild = 'factory'
     }
 
-    // Vehicle spawn
+    // Vehicle spawn or start game
     if (e.key === ' ') {
       e.preventDefault()
-      if (game.money >= 200 && !game.buildMenuOpen) {
+      if (!game.gameStarted) {
+        game.startGame()
+      } else if (game.money >= 200 && !game.buildMenuOpen) {
         game.spawnVehicle('jeep')
       }
     }

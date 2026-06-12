@@ -17,7 +17,9 @@ const deltaTime = 1000 / FPS
 function gameLoop(currentTime) {
   if (currentTime - lastTime >= deltaTime) {
     updateInput(game)
-    game.update(deltaTime / 1000)
+    if (game.gameStarted && !game.levelComplete && !game.levelFailed) {
+      game.update(deltaTime / 1000)
+    }
 
     // Camera follows player
     const cameraX = Math.max(canvas.width / 2, Math.min(game.squad.selectedUnit.x - canvas.width / 2, game.width - canvas.width / 2))
