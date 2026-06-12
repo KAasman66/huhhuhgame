@@ -61,9 +61,19 @@ export class Terrain {
     const ctx = this.base.getContext('2d')!
     const layout = this.computeLayout(rng)
 
-    const useArt = art.ready && art.tiles.grass.length > 0
-    if (useArt) this.paintWithTiles(ctx, rng, layout)
-    else this.paintProcedural(ctx, rng, layout)
+    const tiles = art.tiles
+    const useArt =
+      art.ready && tiles.grass.length > 0 && tiles.dirt.length > 0 && tiles.water.length > 0 && tiles.forest.length > 0
+    if (useArt) {
+      try {
+        this.paintWithTiles(ctx, rng, layout)
+      } catch (e) {
+        console.warn('[terrain] tile paint failed — procedural fallback', e)
+        this.paintProcedural(ctx, rng, layout)
+      }
+    } else {
+      this.paintProcedural(ctx, rng, layout)
+    }
 
     this.markBlocked(layout)
   }
@@ -136,7 +146,13 @@ export class Terrain {
   private paintWithTiles(ctx: CanvasRenderingContext2D, rng: RNG, layout: Layout) {
     const T = 120
     const tiles = art.tiles
-    const pickGrass = (): Sprite => (rng.chance(0.85) ? tiles.grass[rng.int(0, 2)] : tiles.grass[rng.int(3, tiles.grass.length - 1)])
+    const pickGrass = (): Sprite => {
+      const variantMax = Math.min(2, tiles.grass.length - 1)
+      if (tiles.grass.length > 3 && rng.chance(0.15)) {
+        return tiles.grass[rng.int(3, tiles.grass.length - 1)]
+      }
+      return tiles.grass[rng.int(0, variantMax)]
+    }
 
     for (let y = 0; y < this.h; y += T) {
       for (let x = 0; x < this.w; x += T) {

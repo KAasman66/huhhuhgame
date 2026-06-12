@@ -74,6 +74,11 @@ function boxArea(b: Box) {
 
 /** Largest opaque blob inside a cell. */
 function largestInCell(ctx: CanvasRenderingContext2D, rx: number, ry: number, rw: number, rh: number): Box | null {
+  rx = Math.floor(rx)
+  ry = Math.floor(ry)
+  rw = Math.floor(rw)
+  rh = Math.floor(rh)
+  if (rw <= 0 || rh <= 0) return null
   const data = ctx.getImageData(rx, ry, rw, rh).data
   const seen = new Uint8Array(rw * rh)
   const stack: number[] = []
@@ -125,17 +130,17 @@ function sliceGrid(
   cols: number,
   rows: number,
 ): Sprite[][] {
-  const cw = rw / cols
-  const ch = rh / rows
+  const cw = Math.floor(rw / cols)
+  const ch = Math.floor(rh / rows)
   const out: Sprite[][] = []
   for (let row = 0; row < rows; row++) {
     const r: Sprite[] = []
     for (let col = 0; col < cols; col++) {
-      const pad = 4
+      const pad = Math.min(4, Math.floor(Math.min(cw, ch) / 4))
       const b = largestInCell(ctx, rx + col * cw + pad, ry + row * ch + pad, cw - pad * 2, ch - pad * 2)
       if (b) r.push(cropToSprite(ctx, b))
     }
-    if (r.length) out.push(r)
+    out.push(r)
   }
   return out
 }
@@ -177,26 +182,29 @@ class ArtStore {
   tiles: { grass: Sprite[]; dirt: Sprite[]; water: Sprite[]; forest: Sprite[] } = { grass: [], dirt: [], water: [], forest: [] }
 
   async load() {
-    try {
-      const [sheet, sheet2, tilesImg] = await Promise.all([
-        loadImage('/art/sheet.png'),
-        loadImage('/art/sheet2.png'),
-        loadImage('/art/tiles.png'),
-      ])
-      if (sheet) this.parseTitleFromSheet(sheet)
-      else if (sheet2) this.parseTitleFromSheet2(sheet2)
-
-      if (sheet2) this.parseSpritesFromSheet2(sheet2)
-      else if (sheet) this.parseSpritesFromSheet(sheet)
-
-      if (tilesImg) this.parseTiles(tilesImg)
-      else if (sheet) this.parseEmbeddedTiles(sheet)
-
-      this.ready = true
-      console.info('[art] loaded', this.summary())
-    } catch (e) {
-      console.warn('[art] loading failed — procedural fallback', e)
+    const [sheet, sheet2, tilesImg] = await Promise.all([
+      loadImage('/art/sheet.png'),
+      loadImage('/art/sheet2.png'),
+      loadImage('/art/tiles.png'),
+    ])
+    const safe = (label: string, fn: () => void) => {
+      try {
+        fn()
+      } catch (e) {
+        console.warn(`[art] ${label} failed`, e)
+      }
     }
+    if (sheet) safe('title', () => this.parseTitleFromSheet(sheet))
+    else if (sheet2) safe('title', () => this.parseTitleFromSheet2(sheet2))
+
+    if (sheet2) safe('sprites', () => this.parseSpritesFromSheet2(sheet2))
+    else if (sheet) safe('sprites', () => this.parseSpritesFromSheet(sheet))
+
+    if (tilesImg) safe('tiles', () => this.parseTiles(tilesImg))
+    else if (sheet) safe('tiles', () => this.parseEmbeddedTiles(sheet))
+
+    this.ready = true
+    console.info('[art] loaded', this.summary())
   }
 
   summary() {
