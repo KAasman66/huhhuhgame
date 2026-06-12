@@ -4,8 +4,8 @@ import { initInput, update as updateInput } from './input.js'
 const canvas = document.getElementById('gameCanvas')
 const ctx = canvas.getContext('2d')
 
-canvas.width = 1280
-canvas.height = 720
+canvas.width = 2000
+canvas.height = 1200
 
 const game = new GameState(canvas.width, canvas.height)
 initInput(game, canvas)

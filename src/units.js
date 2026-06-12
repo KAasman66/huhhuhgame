@@ -158,16 +158,22 @@ export class Squad {
     }
   }
 
-  fireAt(x, y) {
+  fireAt(x, y, bulletCallback) {
     for (const unit of this.units) {
       if (!unit.alive) continue
       const dx = x - unit.x
       const dy = y - unit.y
       const dist = Math.hypot(dx, dy)
+      const angle = Math.atan2(dy, dx)
 
       if (dist <= unit.fireRange && unit.canFire()) {
         unit.fire()
-        unit.angle = Math.atan2(dy, dx)
+        unit.angle = angle
+        if (bulletCallback) {
+          bulletCallback(unit.x + Math.cos(angle) * unit.size / 2,
+                        unit.y + Math.sin(angle) * unit.size / 2,
+                        angle)
+        }
       }
     }
   }

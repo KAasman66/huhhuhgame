@@ -60,8 +60,16 @@ export const BUILDING_CONFIG = {
 // Game config
 export const GAME_CONFIG = {
   gridSize: 20,
-  mapWidth: 1280,
-  mapHeight: 720,
+  mapWidth: 2000,
+  mapHeight: 1200,
   startingMoney: 1000,
   killReward: 100,
+}
+
+// Bullet config
+export const BULLET_CONFIG = {
+  speed: 400,
+  lifetime: 3,
+  size: 4,
+  damage: 25,
 }

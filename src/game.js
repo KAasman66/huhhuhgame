@@ -1,5 +1,7 @@
 import { Squad } from './units.js'
 import { GameMap } from './map.js'
+import { Bullet } from './bullets.js'
+import { Pickup } from './pickups.js'
 import { GAME_CONFIG, COLORS } from './assets.js'
 
 export class GameState {
@@ -7,8 +9,10 @@ export class GameState {
     this.width = width
     this.height = height
     this.map = new GameMap(width, height)
-    this.squad = new Squad(100, 300)
+    this.squad = new Squad(200, 600)
     this.enemies = []
+    this.bullets = []
+    this.pickups = []
     this.money = GAME_CONFIG.startingMoney
     this.mouseX = 0
     this.mouseY = 0
@@ -16,9 +20,10 @@ export class GameState {
     this.selectedBuildType = null
     this.spawnTimer = 0
     this.waveCount = 0
+    this.kills = 0
 
     this.addEnemyWave()
-    this.map.addBuilding(1150, 100, 'base', true)
+    this.map.addBuilding(1800, 100, 'base', true)
   }
 
   toggleBuildMenu() {
@@ -49,15 +54,10 @@ export class GameState {
     // Otherwise, move squad to click position
     this.squad.moveTo(x, y)
 
-    // Check if clicking on enemy
-    for (const enemy of this.enemies) {
-      if (!enemy.alive) continue
-      const dx = x - enemy.x
-      const dy = y - enemy.y
-      if (Math.hypot(dx, dy) < enemy.size * 2) {
-        this.squad.fireAt(enemy.x, enemy.y)
-      }
-    }
+    // Fire at click position
+    this.squad.fireAt(x, y, (bx, by, angle) => {
+      this.bullets.push(new Bullet(bx, by, angle))
+    })
   }
 
   addEnemyWave() {
@@ -78,6 +78,32 @@ export class GameState {
   update(delta) {
     this.squad.update(delta)
 
+    // Update bullets
+    for (const bullet of this.bullets) {
+      bullet.update(delta)
+    }
+
+    // Update pickups
+    for (const pickup of this.pickups) {
+      pickup.update(delta)
+    }
+
+    // Pickup collection
+    for (const unit of this.squad.units) {
+      if (!unit.alive) continue
+      for (const pickup of this.pickups) {
+        if (!pickup.alive) continue
+        if (pickup.hitsUnit(unit)) {
+          if (pickup.type === 'health') {
+            unit.health = Math.min(unit.maxHealth, unit.health + 30)
+          } else if (pickup.type === 'ammo') {
+            unit.fireRate = Math.max(0.1, unit.fireRate - 0.1)
+          }
+          pickup.alive = false
+        }
+      }
+    }
+
     for (const enemySquad of this.enemies) {
       enemySquad.update(delta)
 
@@ -90,7 +116,51 @@ export class GameState {
         if (dist > 150) {
           enemySquad.moveTo(this.squad.selectedUnit.x, this.squad.selectedUnit.y)
         } else {
-          enemySquad.fireAt(this.squad.selectedUnit.x, this.squad.selectedUnit.y)
+          enemySquad.fireAt(this.squad.selectedUnit.x, this.squad.selectedUnit.y, (bx, by, angle) => {
+            this.bullets.push(new Bullet(bx, by, angle))
+          })
+        }
+      }
+    }
+
+    // Bullet vs enemy collision
+    for (const bullet of this.bullets) {
+      if (!bullet.alive) continue
+
+      for (const enemySquad of this.enemies) {
+        for (const enemy of enemySquad.units) {
+          if (!enemy.alive) continue
+
+          if (bullet.hitsUnit(enemy)) {
+            enemy.takeDamage(bullet.damage)
+            bullet.alive = false
+
+            if (!enemy.alive) {
+              this.money += GAME_CONFIG.killReward
+              this.kills++
+              // Spawn pickup on death
+              if (Math.random() > 0.3) {
+                const pickupType = Math.random() > 0.6 ? 'health' : 'ammo'
+                this.pickups.push(new Pickup(enemy.x, enemy.y, pickupType))
+              }
+            }
+            break
+          }
+        }
+      }
+    }
+
+    // Bullet vs player collision (friendly fire!)
+    for (const bullet of this.bullets) {
+      if (!bullet.alive) continue
+
+      for (const unit of this.squad.units) {
+        if (!unit.alive) continue
+
+        if (bullet.hitsUnit(unit)) {
+          unit.takeDamage(bullet.damage * 0.5) // half damage from friendly fire
+          bullet.alive = false
+          break
         }
       }
     }
@@ -116,6 +186,10 @@ export class GameState {
       }
     }
 
+    // Remove dead bullets and pickups
+    this.bullets = this.bullets.filter(b => b.alive)
+    this.pickups = this.pickups.filter(p => p.alive)
+
     // Remove dead enemy squads
     this.enemies = this.enemies.filter(squad => squad.getAliveCount() > 0)
 
@@ -133,6 +207,16 @@ export class GameState {
       enemySquad.render(ctx)
     }
 
+    // Render pickups
+    for (const pickup of this.pickups) {
+      pickup.render(ctx)
+    }
+
+    // Render bullets
+    for (const bullet of this.bullets) {
+      bullet.render(ctx)
+    }
+
     // HUD
     this.renderHUD(ctx)
 
@@ -143,8 +227,8 @@ export class GameState {
   }
 
   renderHUD(ctx) {
-    document.getElementById('money').textContent = `Cash: $${this.money}`
-    document.getElementById('units').textContent = `Units: ${this.squad.getAliveCount()}/${this.squad.units.length}`
+    document.getElementById('money').textContent = `Cash: $${this.money} | Kills: ${this.kills}`
+    document.getElementById('units').textContent = `Units: ${this.squad.getAliveCount()}/${this.squad.units.length} | Enemies: ${this.enemies.reduce((sum, sq) => sum + sq.getAliveCount(), 0)}`
   }
 
   renderBuildMenu(ctx) {
