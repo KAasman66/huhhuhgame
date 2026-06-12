@@ -18,7 +18,16 @@ function gameLoop(currentTime) {
   if (currentTime - lastTime >= deltaTime) {
     updateInput(game)
     game.update(deltaTime / 1000)
+
+    // Camera follows player
+    const cameraX = Math.max(canvas.width / 2, Math.min(game.squad.selectedUnit.x - canvas.width / 2, game.width - canvas.width / 2))
+    const cameraY = Math.max(canvas.height / 2, Math.min(game.squad.selectedUnit.y - canvas.height / 2, game.height - canvas.height / 2))
+
+    ctx.save()
+    ctx.translate(-cameraX + canvas.width / 2, -cameraY + canvas.height / 2)
     game.render(ctx)
+    ctx.restore()
+
     lastTime = currentTime
   }
   requestAnimationFrame(gameLoop)

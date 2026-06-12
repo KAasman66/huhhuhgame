@@ -2,6 +2,7 @@ import { Squad } from './units.js'
 import { GameMap } from './map.js'
 import { Bullet } from './bullets.js'
 import { Pickup } from './pickups.js'
+import { ParticleEmitter } from './particles.js'
 import { GAME_CONFIG, COLORS } from './assets.js'
 
 export class GameState {
@@ -13,6 +14,7 @@ export class GameState {
     this.enemies = []
     this.bullets = []
     this.pickups = []
+    this.particles = []
     this.money = GAME_CONFIG.startingMoney
     this.mouseX = 0
     this.mouseY = 0
@@ -88,6 +90,11 @@ export class GameState {
       pickup.update(delta)
     }
 
+    // Update particles
+    for (const emitter of this.particles) {
+      emitter.update(delta)
+    }
+
     // Pickup collection
     for (const unit of this.squad.units) {
       if (!unit.alive) continue
@@ -138,6 +145,9 @@ export class GameState {
             if (!enemy.alive) {
               this.money += GAME_CONFIG.killReward
               this.kills++
+              // Explosion effect
+              this.particles.push(new ParticleEmitter(enemy.x, enemy.y, 8, 0, 0, Math.PI * 2, 0.6, '#ff6600'))
+              this.particles.push(new ParticleEmitter(enemy.x, enemy.y, 4, 0, 0, Math.PI * 2, 0.8, '#ffff00'))
               // Spawn pickup on death
               if (Math.random() > 0.3) {
                 const pickupType = Math.random() > 0.6 ? 'health' : 'ammo'
@@ -186,9 +196,10 @@ export class GameState {
       }
     }
 
-    // Remove dead bullets and pickups
+    // Remove dead bullets, pickups, and particles
     this.bullets = this.bullets.filter(b => b.alive)
     this.pickups = this.pickups.filter(p => p.alive)
+    this.particles = this.particles.filter(e => !e.isDead())
 
     // Remove dead enemy squads
     this.enemies = this.enemies.filter(squad => squad.getAliveCount() > 0)
@@ -212,7 +223,12 @@ export class GameState {
       pickup.render(ctx)
     }
 
-    // Render bullets
+    // Render particles
+    for (const emitter of this.particles) {
+      emitter.render(ctx)
+    }
+
+    // Render bullets (on top)
     for (const bullet of this.bullets) {
       bullet.render(ctx)
     }
