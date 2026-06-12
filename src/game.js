@@ -68,14 +68,41 @@ export class GameState {
   }
 
   addEnemyWave() {
-    const waveSize = 3 + this.waveCount
+    const waveSize = 3 + Math.floor(this.waveCount * 0.5)
+    const spawnSides = ['top', 'right', 'bottom', 'left']
+    const sides = spawnSides.sort(() => Math.random() - 0.5).slice(0, Math.min(2, waveSize))
+
     for (let i = 0; i < waveSize; i++) {
-      const x = Math.random() * 400 + 800
-      const y = Math.random() * 600
+      let x, y
+      const side = sides[i % sides.length]
+
+      if (side === 'top') {
+        x = Math.random() * this.width
+        y = -100
+      } else if (side === 'bottom') {
+        x = Math.random() * this.width
+        y = this.height + 100
+      } else if (side === 'left') {
+        x = -100
+        y = Math.random() * this.height
+      } else {
+        x = this.width + 100
+        y = Math.random() * this.height
+      }
+
       const enemy = new Squad(x, y)
-      // Convert squad to enemy units
+      // Vary difficulty per wave
       for (const unit of enemy.units) {
         unit.isPlayer = false
+        // Harder enemies as waves progress
+        if (this.waveCount > 2) {
+          unit.moveSpeed += 20
+          unit.fireRate *= 0.9 // Faster
+        }
+        if (this.waveCount > 4) {
+          unit.health += 20
+          unit.maxHealth += 20
+        }
       }
       this.enemies.push(enemy)
     }

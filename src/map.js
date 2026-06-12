@@ -23,24 +23,38 @@ export class GameMap {
   }
 
   render(ctx) {
+    // Subtle grass with pattern
     ctx.fillStyle = COLORS.grass
     ctx.fillRect(0, 0, this.width, this.height)
 
-    // Grid (optional, for debugging)
+    // Subtle noise texture
+    for (let i = 0; i < 100; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? '#165c16' : '#1a6b1a'
+      ctx.fillRect(
+        Math.random() * this.width,
+        Math.random() * this.height,
+        Math.random() * 40 + 10,
+        Math.random() * 40 + 10
+      )
+    }
+
+    // Faint grid lines (optional, for debugging)
     ctx.strokeStyle = COLORS.gridLine
-    ctx.lineWidth = 1
-    for (let x = 0; x < this.width; x += this.gridSize) {
+    ctx.lineWidth = 0.5
+    ctx.globalAlpha = 0.1
+    for (let x = 0; x < this.width; x += this.gridSize * 2) {
       ctx.beginPath()
       ctx.moveTo(x, 0)
       ctx.lineTo(x, this.height)
       ctx.stroke()
     }
-    for (let y = 0; y < this.height; y += this.gridSize) {
+    for (let y = 0; y < this.height; y += this.gridSize * 2) {
       ctx.beginPath()
       ctx.moveTo(0, y)
       ctx.lineTo(this.width, y)
       ctx.stroke()
     }
+    ctx.globalAlpha = 1.0
 
     // Buildings
     for (const building of this.buildings) {
