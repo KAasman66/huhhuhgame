@@ -5,6 +5,7 @@ import { Vehicle } from './vehicles.js'
 import { Bullet } from './bullets.js'
 import { Pickup } from './pickups.js'
 import { ParticleEmitter } from './particles.js'
+import { SoundFX } from './audio.js'
 import { GAME_CONFIG, COLORS } from './assets.js'
 import { CAMPAIGN_LEVELS } from './levels.js'
 
@@ -104,6 +105,7 @@ export class GameState {
     // Fire at click position
     this.squad.fireAt(x, y, (bx, by, angle) => {
       this.bullets.push(new Bullet(bx, by, angle))
+      SoundFX.gunFire()
     })
   }
 
@@ -248,6 +250,7 @@ export class GameState {
           } else if (pickup.type === 'ammo') {
             unit.fireRate = Math.max(0.1, unit.fireRate - 0.1)
           }
+          SoundFX.powerup()
           pickup.alive = false
         }
       }
@@ -310,6 +313,7 @@ export class GameState {
               // Explosion effect
               this.particles.push(new ParticleEmitter(enemy.x, enemy.y, 8, 0, 0, Math.PI * 2, 0.6, '#ff6600'))
               this.particles.push(new ParticleEmitter(enemy.x, enemy.y, 4, 0, 0, Math.PI * 2, 0.8, '#ffff00'))
+              SoundFX.explosion()
               // Spawn pickup on death
               if (Math.random() > 0.3) {
                 const pickupType = Math.random() > 0.6 ? 'health' : 'ammo'

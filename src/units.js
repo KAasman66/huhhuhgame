@@ -1,19 +1,37 @@
 import { UNIT_CONFIG, COLORS } from './assets.js'
 
 export class Unit {
-  constructor(x, y, isPlayer = true) {
+  constructor(x, y, isPlayer = true, variant = 'standard') {
     this.x = x
     this.y = y
     this.isPlayer = isPlayer
-    this.health = UNIT_CONFIG.maxHealth
-    this.maxHealth = UNIT_CONFIG.maxHealth
+    this.variant = variant
+
+    // Variant-based stats
+    if (variant === 'heavy') {
+      this.health = 150
+      this.maxHealth = 150
+      this.moveSpeed = UNIT_CONFIG.moveSpeed * 0.7
+      this.fireRate = UNIT_CONFIG.fireRate * 1.5
+      this.fireRange = UNIT_CONFIG.fireRange
+    } else if (variant === 'scout') {
+      this.health = 60
+      this.maxHealth = 60
+      this.moveSpeed = UNIT_CONFIG.moveSpeed * 1.5
+      this.fireRate = UNIT_CONFIG.fireRate * 0.8
+      this.fireRange = UNIT_CONFIG.fireRange * 1.3
+    } else {
+      this.health = UNIT_CONFIG.maxHealth
+      this.maxHealth = UNIT_CONFIG.maxHealth
+      this.moveSpeed = UNIT_CONFIG.moveSpeed
+      this.fireRate = UNIT_CONFIG.fireRate
+      this.fireRange = UNIT_CONFIG.fireRange
+    }
+
     this.angle = 0
     this.velocity = { x: 0, y: 0 }
-    this.moveSpeed = UNIT_CONFIG.moveSpeed
     this.size = UNIT_CONFIG.size
-    this.fireRate = UNIT_CONFIG.fireRate
     this.fireTimer = 0
-    this.fireRange = UNIT_CONFIG.fireRange
     this.selected = false
     this.alive = true
   }
@@ -76,7 +94,7 @@ export class Unit {
     if (!this.alive) return
 
     const color = this.isPlayer ? (this.selected ? COLORS.playerSelected : COLORS.player) : COLORS.enemy
-    const size = this.size
+    const size = this.variant === 'heavy' ? this.size * 1.3 : this.variant === 'scout' ? this.size * 0.8 : this.size
 
     ctx.save()
     ctx.translate(this.x, this.y)
@@ -88,12 +106,26 @@ export class Unit {
     ctx.arc(0, 0, size / 2.2, 0, Math.PI * 2)
     ctx.fill()
 
+    // Variant indicator
+    if (this.variant === 'heavy') {
+      ctx.fillStyle = '#666'
+      ctx.beginPath()
+      ctx.arc(-2, -2, 2, 0, Math.PI * 2)
+      ctx.fill()
+    } else if (this.variant === 'scout') {
+      ctx.fillStyle = '#ffff00'
+      ctx.beginPath()
+      ctx.arc(0, 0, 2, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
     // Gun barrel
+    const barrelLength = this.variant === 'heavy' ? size / 1.5 : this.variant === 'scout' ? size / 1.2 : size / 2
     ctx.strokeStyle = color
-    ctx.lineWidth = 2
+    ctx.lineWidth = this.variant === 'heavy' ? 2.5 : 2
     ctx.beginPath()
     ctx.moveTo(0, 0)
-    ctx.lineTo(size / 2, 0)
+    ctx.lineTo(barrelLength, 0)
     ctx.stroke()
 
     // Eyes when selected
@@ -126,18 +158,25 @@ export class Unit {
 }
 
 export class Squad {
-  constructor(x, y) {
+  constructor(x, y, isPlayer = true) {
     this.units = []
     this.selectedUnit = null
     this.formation = 'column'
     this.defender = false
 
+    // Mixed squad composition: 2 heavy, 2 scout, 2 standard
+    const variants = ['heavy', 'heavy', 'scout', 'scout', 'standard', 'standard']
     for (let i = 0; i < UNIT_CONFIG.squadSize; i++) {
       const offsetX = (i % 3) * 30
       const offsetY = Math.floor(i / 3) * 30
-      this.units.push(new Unit(x + offsetX, y + offsetY, true))
+      const variant = isPlayer ? variants[i] : Math.random() > 0.5 ? 'heavy' : 'standard'
+      this.units.push(new Unit(x + offsetX, y + offsetY, isPlayer, variant))
     }
     this.selectUnit(this.units[0])
+  }
+
+  getAliveCount() {
+    return this.units.filter(u => u.alive).length
   }
 
   selectUnit(unit) {
