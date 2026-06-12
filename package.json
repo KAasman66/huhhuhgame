@@ -1,0 +1,18 @@
+{
+  "name": "screener-game",
+  "version": "1.0.0",
+  "description": "Cannon Fodder + Red Alert hybrid game",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^8.0.16"
+  }
+}

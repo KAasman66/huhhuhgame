@@ -1,0 +1,42 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #222;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+#gameCanvas {
+  display: block;
+  background: #1a1a1a;
+  border: 2px solid #444;
+}
+
+#hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: #00ff00;
+  font-weight: bold;
+  text-shadow: 0 0 5px #00ff00;
+  font-size: 14px;
+  z-index: 100;
+}
+
+#money {
+  margin-bottom: 8px;
+}
+
+#units {
+  margin-bottom: 8px;
+}
+
+#instructions {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 16px;
+}
