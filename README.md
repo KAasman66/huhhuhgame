@@ -1,145 +1,62 @@
-# TACTICAL CHAOS — Cannon Fodder + Red Alert Hybrid
+# CHAOS FODDER
 
-High-octane arcade-style tactical action game blending squad-based infantry combat with tower defense and strategic vehicle warfare. Command your elite squad through 5 campaign missions of escalating chaos!
+> *War is hell. Profit is forever.*
 
-## How to Play
+A top-down tactical action game: **Cannon Fodder** squad control, **Red Alert** economy & base building, and a healthy dose of **Postal** chaos. 100% procedural — every sprite, decal, screen and sound effect is generated in code. Zero assets, zero runtime dependencies.
 
-### Controls
-- **A** = Move squad to clicked location
-- **D** = Defend hold (squad holds ground)
-- **S** = Spread formation (soldiers spread in circle)
-- **E** = Build menu (coming soon)
-- **Left Click** = Select unit OR fire at location
-- **Mouse** = Aim and position
-
-### Gameplay Loop
-1. **Command your squad**: Click on a soldier to select, rest follow
-2. **Take down enemies**: Click on enemies to fire, manage waves
-3. **Collect pickups**: 
-   - 🟨 Yellow = Ammo (faster fire rate)
-   - 🟩 Green = Health (restore HP)
-4. **Defend towers**: Watchtowers auto-fire at enemies
-5. **Survive waves**: Each wave gets harder with more enemies
-
-### Key Mechanics
-
-**Squad System**
-- 6 soldiers per squad, can die (respawn next wave)
-- Selected soldier (yellow highlight) leads formation
-- Others follow in column or spread
-
-**Combat**
-- Click to fire (costs ammo via fire rate)
-- Friendly fire enabled (be careful!)
-- 25 damage per shot, towers do extra
-
-**Enemy AI**
-- Patrol and chase player squad
-- Fire back with bullets
-- Spawn in waves with increasing difficulty
-
-**Resources**
-- Kill enemies → $100 per kill
-- Spend money on buildings (future)
-
-## Dev Setup
+## Run it
 
 ```bash
 npm install
-npm run dev
-# Opens at http://localhost:5173
+npm run dev        # → http://localhost:5173
 ```
 
-## Game Map
-- 2000x1200 pixels (large arena)
-- Top-down view with camera follow
-- Two defensive towers at spawn
+Tech: **TypeScript + Vite + Canvas 2D + WebAudio**. `npm run typecheck` for a strict type pass.
 
-## Architecture
+## How to play
+
+| Input | Action |
+|---|---|
+| **LMB** | Move squad (click a friendly vehicle to board it) |
+| **RMB (hold)** | Fire at the crosshair |
+| **G** | Throw grenade |
+| **S** | Toggle formation (column / spread) |
+| **E** | Field requisitions: buildings, recruits, vehicles |
+| **SPACE** | Dismount vehicle |
+| **M** | Music on/off |
+| **ESC** | Cancel / close |
+
+Your squad follows the leader (yellow chevron). Soldiers auto-engage threats at close range. Friendly explosions hurt **everyone** — including you and any civilians in the area. HQ deducts $200 per civilian "accident".
+
+## Features
+
+- **Named recruits with ranks** — every soldier has a name and earns promotions (PVT → CPL → SGT → CPT) that boost fire rate. Veterans carry over between missions.
+- **Boot Hill** — every fallen soldier gets a permanent grave (localStorage). Visit them from the title screen.
+- **Red Alert economy** — earn cash per kill, loot crates, build gun towers / barracks / war factory, hire recruits, buy jeeps and tanks.
+- **Mountable vehicles** — the whole squad piles into a jeep or tank; tank shells leave craters.
+- **Fog of war** — classic RTS shroud, revealed by your units and buildings.
+- **Persistent gore** — blood, corpses, craters and scorch marks are stamped into the battlefield forever.
+- **Civilians** — rescue them for cash ($400) or traumatize them; they panic, flee and scream. Postal rules.
+- **5-mission campaign** + **Endless mode** with a kill-count high score.
+- **Procedural audio** — synthesized gunfire, explosions, screams, plus a dark synth music loop.
+
+## Campaign
+
+1. **FIRST BLOOD** — eliminate all patrols
+2. **GOOD SAMARITAN** — escort civilians to the evac zone
+3. **URBAN RENEWAL** — destroy the enemy HQ (building unlocked)
+4. **HOLD THE LINE** — survive 6 assault waves (vehicles unlocked)
+5. **TOTAL CHAOS** — wipe out HQ and all enemy barracks
+
+## Architecture (`src/`)
 
 ```
-src/
-├── main.js          → Game loop + camera
-├── game.js          → GameState manager
-├── units.js         → Unit/Squad classes
-├── buildings.js     → Tower/defensive structures
-├── bullets.js       → Projectile system
-├── pickups.js       → Health/ammo drops
-├── particles.js     → Explosions & FX
-├── map.js           → Terrain rendering
-├── input.js         → Keyboard/mouse
-└── assets.js        → Constants & config
+core/       math (seeded RNG), input, camera (shake), audio synth, particle/decal FX
+world/      procedural terrain + permanent decal layer, fog of war
+entities/   soldier, vehicle, building, projectile, civilian, pickup
+game/       game orchestration, squad orders, enemy AI, missions,
+            roster/Boot Hill persistence, HUD/minimap, screens
+main.ts     fixed-cap game loop
 ```
 
-## Features Implemented
-
-**CORE GAMEPLAY**
-✅ Squad-based infantry combat with 3 unit variants (heavy/standard/scout)
-✅ Peloton control system — select leader, squad follows
-✅ 6-unit squads with mixed composition
-✅ Click-to-fire targeting with 200-unit range
-
-**COMBAT & WEAPONS**
-✅ Bullet physics with collision detection
-✅ Friendly fire enabled (creates tactical depth)
-✅ Weapon pickups (ammo, health) drop on kills
-✅ Fire rate progression system
-✅ Dynamic health bars (color-coded by health %)
-
-**VEHICLES & BUILDINGS**
-✅ Jeeps (fast, cheap) and Tanks (slow, powerful)
-✅ Vehicle manufacturing with cost system
-✅ Defensive watchtowers with auto-targeting
-✅ Building placement system ($300-$800)
-✅ Destructible buildings with rewards
-
-**ENEMY AI**
-✅ Infantry squad enemy patrols, chase, attack
-✅ Enemy vehicle AI with smart targeting
-✅ Flanking and spreading tactics
-✅ Progressive difficulty scaling per wave
-✅ Enemy vehicle spawning (waves 4+)
-
-**CAMPAIGN & PROGRESSION**
-✅ 5-level campaign with escalating objectives
-✅ Level-based difficulty and wave counts
-✅ Civilian rescue mechanics (+$500/rescue)
-✅ Wave-based progression
-✅ Sandbox difficulty modes
-
-**UI & EFFECTS**
-✅ Real-time minimap (top-right, color-coded units)
-✅ Particle explosions (infantry kills, vehicles, buildings)
-✅ Sound effects (gun fire, explosions, pickups)
-✅ Level intro screens with objectives
-✅ Victory/defeat screens with detailed stats
-✅ HUD with cash, kills, units, enemies, wave count
-
-**POLISH**
-✅ Camera follow with smooth panning
-✅ Animated start screens
-✅ Score calculation with bonuses
-✅ Speed bonuses (complete level <2min = +$1000)
-✅ Detailed victory breakdown
-✅ Game pause during menus
-
-## Potential Expansions
-
-- [ ] Multiplayer (PvP squad battles)
-- [ ] More campaign levels (10+)
-- [ ] Unit upgrades system
-- [ ] Weather effects
-- [ ] Advanced AI tactics
-- [ ] Custom map editor
-- [ ] Leaderboards/scoring
-- [ ] Additional vehicle types (APCs, helicopters)
-- [ ] Super weapons
-- [ ] Night vision/thermal mechanics
-
-## Notes
-
-Game uses **Vite** for dev server with hot-reload. Changes auto-reflect in browser.
-
----
-
-Made for arcade fun — Cannon Fodder meets Red Alert! 🎮
+Design notes: terrain and decals render to offscreen canvases (terrain once, decals stamped incrementally — persistence is free). Fog is a coarse grid scaled up with smoothing. All entities are plain classes updated/rendered by `game.ts`; collision is brute-force circle tests, comfortably fast at this scale.

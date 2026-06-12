@@ -1,0 +1,184 @@
+export type MissionKind = 'eliminate' | 'rescue' | 'destroyhq' | 'survive' | 'chaos'
+
+export interface WaveConfig {
+  count: number
+  interval: number
+  size: number
+}
+
+export interface MissionDef {
+  id: number
+  name: string
+  tagline: string
+  brief: string[]
+  seed: number
+  cash: number
+  build: boolean
+  vehicles: boolean
+  squadSize: number
+  kind: MissionKind
+  objectiveText: string
+  civilians: number
+  rescueGoal: number
+  patrols: number
+  patrolSize: number
+  base: 'none' | 'small' | 'big'
+  waves: WaveConfig | null
+  enemyVehicles: number
+}
+
+export const MISSIONS: MissionDef[] = [
+  {
+    id: 1,
+    name: 'FIRST BLOOD',
+    tagline: 'War has never been so much fun',
+    brief: [
+      'Welcome to the meat grinder, rookies.',
+      'Recon spotted hostile patrols in sector 7.',
+      'Find them. Erase them. Try not to die,',
+      'the paperwork is a nightmare.',
+    ],
+    seed: 1337,
+    cash: 0,
+    build: false,
+    vehicles: false,
+    squadSize: 4,
+    kind: 'eliminate',
+    objectiveText: 'ELIMINATE ALL HOSTILE PATROLS',
+    civilians: 4,
+    rescueGoal: 0,
+    patrols: 3,
+    patrolSize: 3,
+    base: 'none',
+    waves: null,
+    enemyVehicles: 0,
+  },
+  {
+    id: 2,
+    name: 'GOOD SAMARITAN',
+    tagline: 'Hearts, minds, and high-velocity rounds',
+    brief: [
+      'Civilians are trapped in the combat zone.',
+      'Walk up to them and they will follow you.',
+      'Drag them back to the EVAC ZONE alive.',
+      'HQ pays $400 a head. Dead ones pay nothing.',
+    ],
+    seed: 4242,
+    cash: 200,
+    build: false,
+    vehicles: false,
+    squadSize: 5,
+    kind: 'rescue',
+    objectiveText: 'ESCORT 4 CIVILIANS TO THE EVAC ZONE',
+    civilians: 7,
+    rescueGoal: 4,
+    patrols: 4,
+    patrolSize: 3,
+    base: 'none',
+    waves: null,
+    enemyVehicles: 0,
+  },
+  {
+    id: 3,
+    name: 'URBAN RENEWAL',
+    tagline: 'Demolition, the fun kind',
+    brief: [
+      'The enemy built a lovely HQ in our sector.',
+      'We disagree with the zoning permit.',
+      'You have a budget now: press E to build',
+      'gun towers and a barracks for reinforcements.',
+      'Level that HQ.',
+    ],
+    seed: 9001,
+    cash: 1200,
+    build: true,
+    vehicles: false,
+    squadSize: 5,
+    kind: 'destroyhq',
+    objectiveText: 'DESTROY THE ENEMY HQ',
+    civilians: 5,
+    rescueGoal: 0,
+    patrols: 3,
+    patrolSize: 4,
+    base: 'small',
+    waves: null,
+    enemyVehicles: 0,
+  },
+  {
+    id: 4,
+    name: 'HOLD THE LINE',
+    tagline: 'They keep coming. So do the invoices.',
+    brief: [
+      'Intel says a counterattack is coming in waves.',
+      'Six of them. Dig in, build towers, buy a tank',
+      'from the war factory if you can afford one.',
+      'Survive all six waves. Simple. Probably.',
+    ],
+    seed: 777,
+    cash: 2000,
+    build: true,
+    vehicles: true,
+    squadSize: 6,
+    kind: 'survive',
+    objectiveText: 'SURVIVE 6 ASSAULT WAVES',
+    civilians: 4,
+    rescueGoal: 0,
+    patrols: 1,
+    patrolSize: 3,
+    base: 'none',
+    waves: { count: 6, interval: 26, size: 4 },
+    enemyVehicles: 0,
+  },
+  {
+    id: 5,
+    name: 'TOTAL CHAOS',
+    tagline: 'Everything. All of it. At once.',
+    brief: [
+      'This is it: their main base of operations.',
+      'HQ, barracks pumping out infantry, gun towers,',
+      'armor patrols. Kill the barracks to stop the',
+      'flow, then flatten the HQ.',
+      'Make it loud. Make it expensive. Make it ours.',
+    ],
+    seed: 666,
+    cash: 2500,
+    build: true,
+    vehicles: true,
+    squadSize: 6,
+    kind: 'chaos',
+    objectiveText: 'DESTROY THE HQ AND ALL ENEMY BARRACKS',
+    civilians: 6,
+    rescueGoal: 0,
+    patrols: 4,
+    patrolSize: 4,
+    base: 'big',
+    waves: null,
+    enemyVehicles: 2,
+  },
+]
+
+export const ENDLESS: MissionDef = {
+  id: 99,
+  name: 'ENDLESS CHAOS',
+  tagline: 'There is no extraction',
+  brief: [
+    'No objectives. No extraction. No mercy.',
+    'Waves of hostiles, forever. Build, fight,',
+    'and see how long your squad lasts.',
+    'Your score is written in other people\u2019s blood.',
+  ],
+  seed: 0, // randomized at load
+  cash: 1500,
+  build: true,
+  vehicles: true,
+  squadSize: 6,
+  kind: 'survive',
+  objectiveText: 'SURVIVE AS LONG AS POSSIBLE',
+  civilians: 5,
+  rescueGoal: 0,
+  patrols: 2,
+  patrolSize: 3,
+  base: 'none',
+  waves: { count: 9999, interval: 24, size: 3 },
+  enemyVehicles: 0,
+}

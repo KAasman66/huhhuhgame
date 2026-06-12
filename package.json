@@ -1,18 +1,19 @@
 {
-  "name": "screener-game",
-  "version": "1.0.0",
-  "description": "Cannon Fodder + Red Alert hybrid game",
+  "name": "chaos-fodder",
+  "version": "2.0.0",
+  "description": "CHAOS FODDER — Cannon Fodder x Red Alert x Postal, fully procedural browser game",
   "type": "module",
-  "main": "index.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
+  "keywords": ["game", "canvas", "typescript"],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "typescript": "^6.0.3",
     "vite": "^8.0.16"
   }
 }
