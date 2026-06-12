@@ -106,6 +106,61 @@ export class GameState {
     this.gameStarted = true
   }
 
+  renderMinimap(ctx) {
+    const minimapWidth = 200
+    const minimapHeight = 150
+    const minimapX = this.width - minimapWidth - 20
+    const minimapY = 20
+
+    const scaleX = minimapWidth / this.width
+    const scaleY = minimapHeight / this.height
+
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+    ctx.fillRect(minimapX, minimapY, minimapWidth, minimapHeight)
+    ctx.strokeStyle = '#00ff00'
+    ctx.lineWidth = 2
+    ctx.strokeRect(minimapX, minimapY, minimapWidth, minimapHeight)
+
+    // Player squad
+    ctx.fillStyle = '#00ff00'
+    for (const unit of this.squad.units) {
+      if (unit.alive) {
+        const px = minimapX + unit.x * scaleX
+        const py = minimapY + unit.y * scaleY
+        ctx.fillRect(px - 2, py - 2, 4, 4)
+      }
+    }
+
+    // Enemies
+    ctx.fillStyle = '#ff0000'
+    for (const enemy of this.enemies) {
+      if (enemy instanceof Squad) {
+        for (const unit of enemy.units) {
+          if (unit.alive) {
+            const px = minimapX + unit.x * scaleX
+            const py = minimapY + unit.y * scaleY
+            ctx.fillRect(px - 1, py - 1, 2, 2)
+          }
+        }
+      } else if (enemy instanceof Vehicle && enemy.alive) {
+        const px = minimapX + enemy.x * scaleX
+        const py = minimapY + enemy.y * scaleY
+        ctx.fillRect(px - 2, py - 2, 4, 4)
+      }
+    }
+
+    // Buildings
+    ctx.fillStyle = '#ffff00'
+    for (const building of this.buildings) {
+      if (building.alive) {
+        const px = minimapX + building.x * scaleX
+        const py = minimapY + building.y * scaleY
+        ctx.fillRect(px - 2, py - 2, 4, 4)
+      }
+    }
+  }
+
   handleKeyA() {
     // A key: toggle between move mode and follow mode (currently defaults to move)
     // This is placeholder; in full implementation would toggle states
@@ -396,6 +451,13 @@ export class GameState {
         if (dist < building.size / 2 + bullet.size) {
           building.takeDamage(bullet.damage)
           bullet.alive = false
+          if (!building.alive) {
+            // Big building explosion
+            this.particles.push(new ParticleEmitter(building.x, building.y, 25, 0, 0, Math.PI * 2, 1.2, '#ff6600'))
+            this.particles.push(new ParticleEmitter(building.x, building.y, 15, 0, 0, Math.PI * 2, 1.5, '#ffff00'))
+            SoundFX.explosion()
+            this.money += 500
+          }
           break
         }
       }
@@ -416,7 +478,11 @@ export class GameState {
           if (!vehicle.alive) {
             this.money += 300
             this.kills++
-            this.particles.push(new ParticleEmitter(vehicle.x, vehicle.y, 15, 0, 0, Math.PI * 2, 0.8, '#ff6600'))
+            // Big explosion for vehicles
+            this.particles.push(new ParticleEmitter(vehicle.x, vehicle.y, 20, 0, 0, Math.PI * 2, 1.0, '#ff6600'))
+            this.particles.push(new ParticleEmitter(vehicle.x, vehicle.y, 10, 0, 0, Math.PI * 2, 1.2, '#ffff00'))
+            SoundFX.explosion()
+            SoundFX.explosion()
           }
           break
         }
@@ -544,7 +610,8 @@ export class GameState {
       bullet.render(ctx)
     }
 
-    // HUD
+    // HUD and minimap
+    this.renderMinimap(ctx)
     this.renderHUD(ctx)
 
     // Build menu (if open)
