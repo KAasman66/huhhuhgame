@@ -1,6 +1,7 @@
 import { angleTo } from '../core/math'
 import { Soldier } from '../entities/soldier'
 import { Vehicle } from '../entities/vehicle'
+import type { Pathfinder } from '../world/path'
 
 export type Formation = 'column' | 'spread'
 
@@ -13,6 +14,8 @@ export class Squad {
   formation: Formation = 'column'
   grenades = 4
   vehicle: Vehicle | null = null
+  /** Injected by the game once terrain exists; null → direct move orders. */
+  pathfinder: Pathfinder | null = null
 
   alive(): Soldier[] {
     return this.soldiers.filter((s) => s.alive)
@@ -33,16 +36,28 @@ export class Squad {
     return this.vehicle !== null && this.vehicle.alive
   }
 
+  /** Route via the pathfinder when available; plain order otherwise. */
+  private dispatch(unit: Soldier | Vehicle, x: number, y: number) {
+    if (this.pathfinder) {
+      const path = this.pathfinder(unit.x, unit.y, x, y)
+      if (path.length > 0) {
+        unit.orderPath(path)
+        return
+      }
+    }
+    unit.orderMove(x, y)
+  }
+
   moveTo(x: number, y: number) {
     if (this.mounted()) {
-      this.vehicle!.orderMove(x, y)
+      this.dispatch(this.vehicle!, x, y)
       return
     }
     const units = this.alive()
     const l = units[0]
     if (!l) return
     const approach = angleTo(l.x, l.y, x, y)
-    l.orderMove(x, y)
+    this.dispatch(l, x, y)
     for (let i = 1; i < units.length; i++) {
       let ox: number
       let oy: number
@@ -60,7 +75,7 @@ export class Squad {
         ox = Math.cos(a) * d
         oy = Math.sin(a) * d
       }
-      units[i].orderMove(x + ox, y + oy)
+      this.dispatch(units[i], x + ox, y + oy)
     }
   }
 

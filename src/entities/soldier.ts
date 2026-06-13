@@ -55,12 +55,28 @@ export class Soldier {
     return 250
   }
 
+  /** Remaining waypoints after the current (tx,ty) target. */
+  route: { x: number; y: number }[] = []
+
   orderMove(x: number, y: number) {
+    this.route.length = 0
     this.tx = x
     this.ty = y
   }
 
+  /** Follow a multi-waypoint route (from the pathfinder). */
+  orderPath(path: { x: number; y: number }[]) {
+    if (path.length === 0) {
+      this.stop()
+      return
+    }
+    this.route = path.slice(1)
+    this.tx = path[0].x
+    this.ty = path[0].y
+  }
+
   stop() {
+    this.route.length = 0
     this.tx = null
     this.ty = null
   }
@@ -73,7 +89,13 @@ export class Soldier {
     if (this.tx !== null && this.ty !== null) {
       const d = dist(this.x, this.y, this.tx, this.ty)
       if (d < 4) {
-        this.stop()
+        const next = this.route.shift()
+        if (next) {
+          this.tx = next.x
+          this.ty = next.y
+        } else {
+          this.stop()
+        }
       } else {
         const a = angleTo(this.x, this.y, this.tx, this.ty)
         this.angle = a

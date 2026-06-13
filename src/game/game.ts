@@ -5,6 +5,7 @@ import { music, sfx } from '../core/audio'
 import { clamp, dist, rnd, rndPick, RNG, angleTo } from '../core/math'
 import { Terrain } from '../world/terrain'
 import { Fog } from '../world/fog'
+import { findPath } from '../world/path'
 import { Soldier, aimSpread } from '../entities/soldier'
 import { Bullet, Grenade } from '../entities/projectile'
 import { Building, BUILDING_STATS, BuildingType } from '../entities/building'
@@ -62,6 +63,7 @@ export class Game {
   private hitstop = 0
   private flashA = 0
   private flashColor = '#ff0000'
+  paused = false
   rescuedCount = 0
   missionTime = 0
   wave = 0
@@ -220,6 +222,10 @@ export class Game {
     this.minimapBase = mm
 
     this.camera.jumpTo(spawn.x, spawn.y, WORLD_W, WORLD_H)
+    this.paused = false
+
+    // Squad move orders route around lakes/buildings from here on.
+    this.squad.pathfinder = (sx, sy, tx, ty) => findPath(this.terrain, this.blockTest, sx, sy, tx, ty)
   }
 
   // ------------------------------------------------------------------
@@ -532,6 +538,11 @@ export class Game {
         }
         break
       case 'playing':
+        if (this.input.pressed('p')) {
+          this.paused = !this.paused
+          sfx.click()
+        }
+        if (this.paused) break
         // Hitstop: freeze the battle for a few frames on heavy impacts.
         // Camera still settles so the freeze reads as deliberate, not a stall.
         if (this.hitstop > 0) {
@@ -1116,6 +1127,7 @@ export class Game {
     }
     if (this.screen === 'playing') {
       drawHUD(this, ctx)
+      this.renderLowHpVignette(ctx)
     }
 
     // Full-screen damage/impact flash (screen space, above world, below menus)
@@ -1128,7 +1140,42 @@ export class Game {
       ctx.globalAlpha = 1
     }
 
+    if (this.paused && this.screen === 'playing') {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#ffe14a'
+      ctx.font = 'bold 42px monospace'
+      ctx.fillText('PAUSED', VIEW_W / 2, VIEW_H / 2 - 8)
+      ctx.fillStyle = '#cfcfcf'
+      ctx.font = '14px monospace'
+      ctx.fillText('[P] RESUME', VIEW_W / 2, VIEW_H / 2 + 24)
+      ctx.textAlign = 'left'
+    }
+
     drawScreens(this, ctx)
+  }
+
+  /** Pulsing red edge vignette when the squad is close to wiping. */
+  private renderLowHpVignette(ctx: CanvasRenderingContext2D) {
+    const units = this.squad.alive()
+    if (units.length === 0) return
+    let frac = 0
+    for (const s of units) frac += s.hp / s.maxHp
+    frac /= units.length
+    // Few survivors should feel desperate even at full health.
+    frac = Math.min(frac, 0.34 + units.length * 0.11)
+    if (frac >= 0.45) return
+    const urgency = (0.45 - frac) / 0.45
+    const a = urgency * (0.38 + 0.14 * Math.sin(this.time * 5.5))
+    const grad = ctx.createRadialGradient(
+      VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.42,
+      VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.78,
+    )
+    grad.addColorStop(0, 'rgba(160,0,0,0)')
+    grad.addColorStop(1, `rgba(160,0,0,${a.toFixed(3)})`)
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H)
   }
 
   private renderWorld(ctx: CanvasRenderingContext2D) {
