@@ -19,7 +19,7 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill · **M** = 
 
 ---
 
-## Status (13 jun 2026)
+## Status (13 jun 2026 — sessie 2)
 
 | Onderdeel | Status |
 |---|---|
@@ -29,11 +29,11 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill · **M** = 
 | Fog of war, minimap, persistent gore/decals | ✅ Werkt |
 | Boot Hill + localStorage progress | ✅ Werkt |
 | Procedural audio + muziekloop | ✅ Werkt |
-| AI title art (`sheet.png`) | ✅ Werkt op titelscherm |
-| AI terrain tiles (`tiles.png`) | ✅ Werkt in wereld-render |
-| AI sprite slicing (units/vehicles/buildings) | ⚠️ Deels — parser verbeterd, nog niet gecommit/tested |
-| GitHub remote / push | ❌ Geen remote, geen `gh` CLI |
-| Oude `.js` bestanden in `src/` | ⚠️ Dode code na reboot, nog niet opgeruimd |
+| AI title art (`sheet.png`) | ✅ Werkt |
+| AI terrain tiles (`tiles.png`) | ✅ Werkt |
+| AI sprite slicing (sheet2.png) | ✅ Gehard — crash gefixt, per-parser try/catch |
+| GitHub remote `KAasman66/huhhuhgame` | ⚠️ User moet `git remote add` + push handmatig draaien |
+| Oude `.js` bestanden in `src/` | ✅ Niet aanwezig (al opgeruimd in reboot) |
 
 ---
 
@@ -164,26 +164,26 @@ Endless: `[E]` op title screen. High score in progress.
 ## Git
 
 ```
-Branch: master
-Laatste commit: 28d0770 — "Full reboot: CHAOS FODDER — TypeScript rewrite from scratch"
-Remote: geen
+Branch: master (moet hernoemd naar main bij eerste push)
+Laatste commits:
+  c13608d — Fix art loader crash: harden grid slicer + per-parser error isolation
+  b76a595 — Add AI art pipeline: title, tiles, sprite sheets with procedural fallback
+  28d0770 — Full reboot: CHAOS FODDER
+Remote configured: NEE (user moet zelf draaien — zie hieronder)
+Target repo: https://github.com/KAasman66/huhhuhgame.git
 ```
 
-**Uncommitted changes (handoff-moment):**
-- `src/core/art.ts` (nieuw)
-- `public/art/*.png` (3 images)
-- `art/` (6 bron-images, root)
-- Wijzigingen in: `main.ts`, `terrain.ts`, `soldier.ts`, `vehicle.ts`, `building.ts`, `screens.ts`
-- Dode oude `.js` files in `src/` (units.js, game.js, etc.) — safe to delete
+**Uncommitted (handoff-moment):**
+- `art/` (6 bron-images van ChatGPT/Gemini, ~15MB) — niet automatisch geladen.
+  Optie: gitignore, of verplaats naar `public/art/sources/`. Niet kritiek.
 
-**Aanrader volgende commit:**
+**Eerste push (user moet zelf draaien — `gh` CLI ontbreekt, geen permission voor `winget install`):**
 ```bash
-git add public/art src/core/art.ts src/main.ts src/world/terrain.ts src/entities/*.ts src/game/screens.ts
-git rm src/*.js   # oude vanilla JS opruimen
-git commit -m "Add AI art pipeline: title, tiles, sprite sheets with procedural fallback"
+git remote add origin https://github.com/KAasman66/huhhuhgame.git
+git branch -M main
+git push -u origin main
 ```
-
-**GitHub push:** wachtwoord-auth werkt niet. User moet `gh auth login` of Personal Access Token. **Wachtwoord is in chat gelekt — laten roteren.**
+Auth via Git Credential Manager (browser-popup) of Personal Access Token. **GEEN** `git init` en **GEEN** README aanmaken — repo heeft al history.
 
 ---
 
@@ -209,12 +209,31 @@ Getest en werkend: title → briefing → playing, combat/kills/money, build tow
 
 ## Volgende stappen (prioriteit)
 
-1. **Commit art-integratie** — uncommitted werk is klaar genoeg; test `__art.summary()` na reload
-2. **Sprite slicing finetunen** — grid-coördinaten in `parseSpritesFromSheet2()` bijstellen als units/buildings nog ontbreken; eventueel handmatige pixel-offsets i.p.v. auto-detect
-3. **Oude `.js` files verwijderen** — rommel in `src/` na reboot
-4. **`art/` root → `public/art/`** consolideren; één bronmap
-5. **GitHub repo** aanmaken + push na user auth
-6. Nice-to-have: pathfinding rond meren, gamepad, screen-flash bij damage, enemy turret rotation op AI buildings
+1. **User: push naar GitHub** — zie Git-sectie hierboven; daarna `git remote -v` bevestigt.
+2. **Sprite slicing visueel verifiëren** — open game in browser, console: `__art.summary()`.
+   Verwacht ruwweg: `{ playerPoses: 3-4, enemyPoses: 3-4, vehicles: 3-4, buildings: 4-6, tiles: 5+ }`.
+   Als een categorie 0 is: `parseSpritesFromSheet2()` grid-coördinaten bijstellen
+   (rx/ry/rw/rh percentages) of overschakelen op handmatige pixel-offsets.
+3. **`art/` root opruimen** — gitignoren of naar `public/art/sources/`. Cosmetisch.
+4. Nice-to-have: pathfinding rond meren, gamepad, screen-flash bij damage,
+   enemy turret rotation op AI buildings, extra sprite-poses (4-frame walk cycle).
+
+## Sessie-2 wijzigingen (sinds vorige handoff)
+
+**Gefixt:**
+- `RangeError: Invalid array length` crash bij sprite parsing op start (sheet2.png).
+  Oorzaak: `largestInCell` kreeg fractional/negatieve dims als pad ≥ cell/2.
+  Fix: floor dims in `largestInCell` + `sliceGrid`, return null bij ≤0 dims.
+- Sprite-parse crash sloopte óók tile-loading omdat alles in één try/catch zat.
+  Fix: `load()` wrapt elke parser apart.
+- `paintWithTiles` kon crashen als grass-tiles array <4 entries had.
+  Fix: `pickGrass()` clampt indices; terrain valt terug op procedural bij paint-exception.
+- Terrain vereist nu álle vier tile-categories voordat tile-painter aan gaat.
+
+**Niet gedaan:**
+- Sprite slicing kwaliteit niet visueel geverifieerd in deze sessie (geen browser test).
+- GitHub push niet uitgevoerd — `winget install gh` geweigerd door permission;
+  user heeft commando-blok voor handmatige push gekregen.
 
 ---
 
@@ -230,4 +249,4 @@ Plaats output in `public/art/` en hernoem desnoods naar `sheet2.png` / `tiles.pn
 
 ---
 
-*Geschreven: 13 jun 2026 — sessie na volledige TS-reboot + start AI-art integratie.*
+*Geschreven: 13 jun 2026 — sessie 2 na art-integratie crash fix.*

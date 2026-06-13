@@ -7,3 +7,6 @@ build/
 .DS_Store
 .vscode/
 .idea/
+
+# AI source art (large, niet runtime-geladen — public/art/ wordt wel gebruikt)
+art/
