@@ -60,3 +60,9 @@ main.ts     fixed-cap game loop
 ```
 
 Design notes: terrain and decals render to offscreen canvases (terrain once, decals stamped incrementally — persistence is free). Fog is a coarse grid scaled up with smoothing. All entities are plain classes updated/rendered by `game.ts`; collision is brute-force circle tests, comfortably fast at this scale.
+
+## Credits
+
+- Trees and bushes: ["Trees and Bushes"](https://opengameart.org/content/trees-and-bushes) by **chabull** — [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/) (`public/art/trees/`)
+- AI-generated art sheets (title, tiles, sprites) in `public/art/` — generated for this project
+- Everything else is procedural, generated in code

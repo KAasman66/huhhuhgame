@@ -180,6 +180,8 @@ class ArtStore {
   }
   buildings: Partial<Record<BuildingSpriteKey, Sprite>> = {}
   tiles: { grass: Sprite[]; dirt: Sprite[]; water: Sprite[]; forest: Sprite[] } = { grass: [], dirt: [], water: [], forest: [] }
+  /** Top-down tree/bush PNGs (chabull, opengameart.org/content/trees-and-bushes, CC-BY 3.0). */
+  trees: Sprite[] = []
 
   async load() {
     const [sheet, sheet2, tilesImg] = await Promise.all([
@@ -187,6 +189,17 @@ class ArtStore {
       loadImage('/art/sheet2.png'),
       loadImage('/art/tiles.png'),
     ])
+
+    // The pack numbers its files with gaps: 01–30, 38–44, 46–55.
+    const treeNums = [...Array(30).keys()].map((i) => i + 1)
+      .concat([38, 39, 40, 41, 42, 43, 44])
+      .concat([...Array(10).keys()].map((i) => i + 46))
+    const treeImgs = await Promise.all(
+      treeNums.map((n) => loadImage(`/art/trees/tree_${String(n).padStart(2, '0')}.png`)),
+    )
+    for (const img of treeImgs) {
+      if (img) this.trees.push(makeCanvasFromRegion(img, 0, 0, img.width, img.height))
+    }
     const safe = (label: string, fn: () => void) => {
       try {
         fn()
@@ -215,6 +228,7 @@ class ArtStore {
       vehicles: Object.values(this.vehicles).filter(Boolean).length,
       buildings: Object.keys(this.buildings).length,
       tiles: this.tiles.grass.length + this.tiles.dirt.length,
+      trees: this.trees.length,
     }
   }
 

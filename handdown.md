@@ -107,7 +107,8 @@ src/
 | `public/art/sheet.png` | Title key art (bovenste ~45%) + embedded sprites/tiles |
 | `public/art/sheet2.png` | Alternatief sheet; **sprites rechts in 4×4 grid** (preferred voor slicing) |
 | `public/art/tiles.png` | 9×6 tile-atlas (grass, dirt, water, forest, bomen, etc.) |
-| `art/` (root) | Bron-images van ChatGPT/Gemini — **niet automatisch geladen**; kopieer naar `public/art/` |
+| `public/art/trees/` | 47 top-down boom/struik PNGs (chabull, opengameart, **CC-BY 3.0** — credit staat in README) |
+| `art/` (root) | Bron-images van ChatGPT/Gemini — **niet automatisch geladen**; kopieer naar `public/art/` (gegitignored) |
 
 Vite serveert `public/` statisch op `/art/...`.
 
@@ -234,6 +235,11 @@ Getest en werkend: title → briefing → playing, combat/kills/money, build tow
 - Hitstop (`freeze()`) + screenflash (`flash()`) in game.ts — rood bij eigen schade, amber bij grote explosies/sloop.
 - Pauze met **P** (reset bij mission-load).
 - Low-HP vignette (pulserend rood randje; weegt ook mee hoe weinig soldaten er nog leven).
+- **Echte bomen/struiken**: chabull's "Trees and Bushes" pack (CC-BY 3.0) in `public/art/trees/`.
+  `art.trees` laadt 47 PNGs (nummering heeft gaten: 01–30, 38–44, 46–55).
+  `terrain.paintFlora()` bakt ze in de base-canvas: grote sprites = blokkerende bomen,
+  kleine (≤50px) = cosmetische struiken (60 stuks, deels geclusterd rond bomen).
+  Fallback naar procedural blobs als de PNGs ontbreken. Visueel geverifieerd via canvas-crop.
 
 **Let op bij testen via Claude-preview:** de tab is hidden → browser pauzeert `requestAnimationFrame`
 → game-loop staat stil. Synchrone calls via `preview_eval` (bv. `game.squad.moveTo(...)`) werken wél;

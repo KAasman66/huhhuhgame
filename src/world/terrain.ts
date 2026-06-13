@@ -15,6 +15,7 @@ interface Layout {
   lakes: Lake[]
   patches: { x: number; y: number; r: number; ry: number; rot: number }[]
   trees: { x: number; y: number }[]
+  bushes: { x: number; y: number; s: number }[]
 }
 
 /**
@@ -75,7 +76,63 @@ export class Terrain {
       this.paintProcedural(ctx, rng, layout)
     }
 
+    this.paintFlora(ctx, rng, layout)
     this.markBlocked(layout)
+  }
+
+  /**
+   * Trees and bushes, baked on top of either paint path. Uses the chabull
+   * top-down pack (CC-BY 3.0) when loaded; procedural blobs otherwise.
+   * Bushes are cosmetic; trees block their cell (see markBlocked).
+   */
+  private paintFlora(ctx: CanvasRenderingContext2D, rng: RNG, layout: Layout) {
+    const sprites = art.trees
+    // Split the pack: small sprites read as bushes, larger ones as trees.
+    const small = sprites.filter((s) => Math.max(s.w, s.h) <= 50)
+    const large = sprites.filter((s) => Math.max(s.w, s.h) > 50)
+
+    for (const b of layout.bushes) {
+      const pool = small.length > 0 ? small : sprites
+      if (pool.length > 0) {
+        const sp = pool[rng.int(0, pool.length - 1)]
+        const w = b.s * 1.6
+        const h = (w * sp.h) / sp.w
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'
+        ctx.beginPath()
+        ctx.ellipse(b.x + 2, b.y + 3, w * 0.4, w * 0.16, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.drawImage(sp.c, b.x - w / 2, b.y - h / 2, w, h)
+      } else {
+        ctx.fillStyle = rng.chance(0.5) ? '#2a5c1e' : '#336b24'
+        ctx.beginPath()
+        ctx.arc(b.x, b.y, b.s * 0.45, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    for (const t of layout.trees) {
+      ctx.fillStyle = 'rgba(0,0,0,0.28)'
+      ctx.beginPath()
+      ctx.ellipse(t.x + 5, t.y + 7, 22, 9, 0, 0, Math.PI * 2)
+      ctx.fill()
+      const pool = large.length > 0 ? large : sprites
+      if (pool.length > 0) {
+        const sp = pool[rng.int(0, pool.length - 1)]
+        const w = rng.range(52, 80)
+        const h = (w * sp.h) / sp.w
+        ctx.drawImage(sp.c, t.x - w / 2, t.y - h / 2, w, h)
+      } else {
+        ctx.fillStyle = '#4a3318'
+        ctx.fillRect(t.x - 2, t.y - 2, 4, 8)
+        const greens = ['#1e4d17', '#266018', '#2d6e1d']
+        for (let b = 0; b < 5; b++) {
+          ctx.fillStyle = greens[b % greens.length]
+          ctx.beginPath()
+          ctx.arc(t.x + rng.range(-7, 7), t.y - 6 + rng.range(-6, 6), rng.range(6, 11), 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+    }
   }
 
   private computeLayout(rng: RNG): Layout {
@@ -112,7 +169,26 @@ export class Terrain {
       trees.push({ x, y })
     }
 
-    return { roadY, lakes, patches, trees }
+    // Decorative bushes: walkable, purely cosmetic. Some cluster near trees.
+    const bushes: Layout['bushes'] = []
+    for (let i = 0; i < 60; i++) {
+      let x: number
+      let y: number
+      if (i < 22 && trees.length > 0) {
+        const t = trees[rng.int(0, trees.length - 1)]
+        x = t.x + rng.range(-70, 70)
+        y = t.y + rng.range(-70, 70)
+      } else {
+        x = rng.range(30, this.w - 30)
+        y = rng.range(30, this.h - 30)
+      }
+      if (x < 30 || y < 30 || x > this.w - 30 || y > this.h - 30) continue
+      if (Math.abs(y - this.roadYAt(roadY, x)) < 45) continue
+      if (lakes.some((l) => ((x - l.x) / (l.rx + 20)) ** 2 + ((y - l.y) / (l.ry + 20)) ** 2 < 1)) continue
+      bushes.push({ x, y, s: rng.range(16, 30) })
+    }
+
+    return { roadY, lakes, patches, trees, bushes }
   }
 
   private roadYAt(roadY: number, x: number): number {
@@ -208,20 +284,6 @@ export class Terrain {
       ctx.restore()
     }
 
-    // Tree groves: clipped circles of the forest tile
-    for (const t of layout.trees) {
-      ctx.fillStyle = 'rgba(0,0,0,0.3)'
-      ctx.beginPath()
-      ctx.ellipse(t.x + 5, t.y + 7, 20, 9, 0, 0, Math.PI * 2)
-      ctx.fill()
-      const f = tiles.forest[rng.int(0, tiles.forest.length - 1)]
-      ctx.save()
-      ctx.beginPath()
-      ctx.arc(t.x, t.y, 24, 0, Math.PI * 2)
-      ctx.clip()
-      ctx.drawImage(f.c, t.x - 32, t.y - 32, 64, 64)
-      ctx.restore()
-    }
   }
 
   // -- Procedural fallback painting ---------------------------------------
@@ -272,21 +334,6 @@ export class Terrain {
       ctx.fill()
     }
 
-    for (const t of layout.trees) {
-      ctx.fillStyle = 'rgba(0,0,0,0.25)'
-      ctx.beginPath()
-      ctx.ellipse(t.x + 5, t.y + 6, 14, 6, 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = '#4a3318'
-      ctx.fillRect(t.x - 2, t.y - 2, 4, 8)
-      const greens = ['#1e4d17', '#266018', '#2d6e1d']
-      for (let b = 0; b < 5; b++) {
-        ctx.fillStyle = greens[b % greens.length]
-        ctx.beginPath()
-        ctx.arc(t.x + rng.range(-7, 7), t.y - 6 + rng.range(-6, 6), rng.range(6, 11), 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
   }
 
   isBlocked(x: number, y: number): boolean {
