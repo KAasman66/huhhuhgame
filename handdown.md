@@ -48,6 +48,7 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill · **M** = 
 | **E** | Shop (towers/barracks/factory/recruits/vehicles) |
 | **SPACE** | Uit voertuig stappen |
 | **M** | Muziek aan/uit |
+| **P** | Pauze aan/uit |
 | **ESC** | Annuleer build-mode / sluit menu |
 | **R** | Retry na game over |
 | **N** | — (niet actief; SPACE op debrief = volgende missie) |
@@ -68,6 +69,7 @@ src/
 │   └── fx.ts            Particles, floating text, stampt decals
 ├── world/
 │   ├── terrain.ts       Procedurele map + AI-tileset paint; permanente decal-layer
+│   ├── path.ts          A* + string-pulling over terrain grid (sessie 3)
 │   └── fog.ts           Grid-based fog (40px cells, soft edges)
 ├── entities/
 │   ├── soldier.ts       Namen, rangen, AI-sprite of procedural fallback
@@ -215,8 +217,27 @@ Getest en werkend: title → briefing → playing, combat/kills/money, build tow
    Als een categorie 0 is: `parseSpritesFromSheet2()` grid-coördinaten bijstellen
    (rx/ry/rw/rh percentages) of overschakelen op handmatige pixel-offsets.
 3. **`art/` root opruimen** — gitignoren of naar `public/art/sources/`. Cosmetisch.
-4. Nice-to-have: pathfinding rond meren, gamepad, screen-flash bij damage,
-   enemy turret rotation op AI buildings, extra sprite-poses (4-frame walk cycle).
+4. Nice-to-have: gamepad, enemy turret rotation op AI buildings,
+   extra sprite-poses (4-frame walk cycle), enemy AI ook via pathfinder
+   (chase loopt nu nog dom tegen meren aan — speler heeft wél A*).
+
+## Sessie-3 wijzigingen (13 jun 2026)
+
+**GitHub:** remote staat erop, `main` gepusht naar `KAasman66/huhhuhgame`. `art/` is gegitignored.
+
+**Toegevoegd:**
+- `world/path.ts` — grid A* (octile, binary heap, geen corner-cutting) + string-pulling.
+  Klik op water/gebouw → herroutet naar dichtstbijzijnde begaanbare cel.
+  `Squad.pathfinder` wordt in `loadMission` geïnjecteerd; per unit een route.
+  Soldier/Vehicle hebben `route[]` + `orderPath()`; `orderMove()` cleart route → AI ongewijzigd.
+  Gemeten: 10 volledige squad-orders ≈ 5.6ms.
+- Hitstop (`freeze()`) + screenflash (`flash()`) in game.ts — rood bij eigen schade, amber bij grote explosies/sloop.
+- Pauze met **P** (reset bij mission-load).
+- Low-HP vignette (pulserend rood randje; weegt ook mee hoe weinig soldaten er nog leven).
+
+**Let op bij testen via Claude-preview:** de tab is hidden → browser pauzeert `requestAnimationFrame`
+→ game-loop staat stil. Synchrone calls via `preview_eval` (bv. `game.squad.moveTo(...)`) werken wél;
+visuele/frame-afhankelijke checks moeten in een echte voorgrond-browser.
 
 ## Sessie-2 wijzigingen (sinds vorige handoff)
 
