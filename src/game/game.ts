@@ -57,6 +57,11 @@ export class Game {
   money = 0
   killCount = 0
   civKills = 0
+
+  // Game feel
+  private hitstop = 0
+  private flashA = 0
+  private flashColor = '#ff0000'
   rescuedCount = 0
   missionTime = 0
   wave = 0
@@ -278,11 +283,26 @@ export class Game {
     this.scareCivs(v.x, v.y, 160, 0.3)
   }
 
+  /** Brief freeze-frame to add impact to big hits. Caps so it never stacks too long. */
+  freeze(sec: number) {
+    this.hitstop = Math.min(0.12, Math.max(this.hitstop, sec))
+  }
+
+  /** Full-screen colour flash (damage feedback, big kills). */
+  flash(color: string, amount: number) {
+    this.flashColor = color
+    this.flashA = Math.max(this.flashA, amount)
+  }
+
   explode(x: number, y: number, r: number, dmg: number) {
     this.fx.explosion(x, y, r)
     this.terrain.stampCrater(x, y, r * 0.75)
     this.terrain.stampScorch(x, y, r * 0.95)
     this.camera.shake(Math.min(14, r / 5), 0.4)
+    if (r > 55) {
+      this.freeze(0.05)
+      if (this.camera.sees(x, y, r)) this.flash('#ffd27a', 0.18)
+    }
     sfx.explosion(r > 60)
     this.scareCivs(x, y, r * 4, 0.8)
 
@@ -383,7 +403,9 @@ export class Game {
   private explodeVisualOnly(x: number, y: number, r: number) {
     this.fx.explosion(x, y, r)
     this.terrain.stampCrater(x, y, r * 0.6)
-    this.camera.shake(8, 0.3)
+    this.camera.shake(9, 0.32)
+    this.freeze(0.04)
+    if (this.camera.sees(x, y, r)) this.flash('#ffd27a', 0.14)
     sfx.explosion(false)
   }
 
@@ -490,6 +512,7 @@ export class Game {
 
   update(dt: number) {
     this.time += dt
+    if (this.flashA > 0) this.flashA = Math.max(0, this.flashA - dt * 2.2)
     if (this.input.pressed('m')) music.toggle()
 
     switch (this.screen) {
@@ -509,7 +532,15 @@ export class Game {
         }
         break
       case 'playing':
-        this.updatePlaying(dt)
+        // Hitstop: freeze the battle for a few frames on heavy impacts.
+        // Camera still settles so the freeze reads as deliberate, not a stall.
+        if (this.hitstop > 0) {
+          this.hitstop -= dt
+          const fp = this.squad.pos()
+          if (fp) this.camera.follow(fp.x, fp.y, WORLD_W, WORLD_H, dt)
+        } else {
+          this.updatePlaying(dt)
+        }
         break
       case 'debrief':
         if (this.input.pressed(' ')) {
@@ -905,8 +936,15 @@ export class Game {
           for (const s of this.squad.alive()) {
             if (dist(b.x, b.y, s.x, s.y) < 9) {
               this.fx.blood(b.x, b.y, Math.atan2(b.vy, b.vx), 5)
-              if (s.damage(b.dmg)) this.onSoldierKilled(s, false, null)
-              else sfx.hurt()
+              if (s.damage(b.dmg)) {
+                this.flash('#cc1111', 0.32)
+                this.freeze(0.05)
+                this.camera.shake(7, 0.3)
+                this.onSoldierKilled(s, false, null)
+              } else {
+                this.flash('#cc1111', 0.14)
+                sfx.hurt()
+              }
               return true
             }
           }
@@ -1079,6 +1117,17 @@ export class Game {
     if (this.screen === 'playing') {
       drawHUD(this, ctx)
     }
+
+    // Full-screen damage/impact flash (screen space, above world, below menus)
+    if (this.flashA > 0) {
+      ctx.save()
+      ctx.globalAlpha = Math.min(0.5, this.flashA)
+      ctx.fillStyle = this.flashColor
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H)
+      ctx.restore()
+      ctx.globalAlpha = 1
+    }
+
     drawScreens(this, ctx)
   }
 
