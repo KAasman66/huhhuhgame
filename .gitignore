@@ -8,5 +8,5 @@ build/
 .vscode/
 .idea/
 
-# AI source art (large, niet runtime-geladen — public/art/ wordt wel gebruikt)
-art/
+# AI source art in repo-root (large, niet runtime-geladen — public/art/ wordt wel gebruikt)
+/art/
