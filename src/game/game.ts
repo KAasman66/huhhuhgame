@@ -121,6 +121,31 @@ export class Game {
     return { x, y }
   }
 
+  /**
+   * Like findOpen, but also keeps `clearance` away from every building so a
+   * freshly produced unit doesn't spawn wedged between structures. Spirals
+   * outward and returns the first genuinely free spot.
+   */
+  private findClear(x: number, y: number, clearance: number): { x: number; y: number } {
+    const free = (px: number, py: number) => {
+      if (this.terrain.isBlocked(px, py)) return false
+      for (const b of this.buildings) {
+        if (b.alive && dist(px, py, b.x, b.y) < b.radius() + clearance + 6) return false
+      }
+      return true
+    }
+    // Random start angle so successive spawns don't all stack on one point.
+    const a0 = Math.random() * Math.PI * 2
+    for (let r = 0; r < 360; r += 14) {
+      for (let a = a0; a < a0 + Math.PI * 2; a += 0.5) {
+        const px = clamp(x + Math.cos(a) * r, 30, WORLD_W - 30)
+        const py = clamp(y + Math.sin(a) * r, 30, WORLD_H - 30)
+        if (free(px, py)) return { x: px, y: py }
+      }
+    }
+    return this.findOpen(x, y)
+  }
+
   loadMission(def: MissionDef) {
     this.mission = def
     const rng = new RNG(def.seed || 1)
@@ -487,7 +512,7 @@ export class Game {
       return
     }
     this.money -= 300
-    const p = this.findOpen(barracks.x, barracks.y + barracks.size * 0.7)
+    const p = this.findClear(barracks.x, barracks.y + barracks.size * 0.7, 10)
     const s = new Soldier(p.x, p.y, 'player', this.roster.nextName())
     this.squad.soldiers.push(s)
     const lead = this.squad.pos()
@@ -505,7 +530,8 @@ export class Game {
       return
     }
     this.money -= cost
-    const p = this.findOpen(factory.x, factory.y + factory.size)
+    // Spawn clear of the factory and any neighbours so it can drive away.
+    const p = this.findClear(factory.x, factory.y + factory.size, VEHICLE_STATS[type].size * 0.6)
     this.playerVehicles.push(new Vehicle(p.x, p.y, type, 'player'))
     this.fx.smoke(p.x, p.y, 5)
     sfx.build()
@@ -655,6 +681,16 @@ export class Game {
       if (b.alive && b.side === 'player') viewers.push({ x: b.x, y: b.y, range: 300 })
     }
     this.fog.update(viewers)
+
+    // Once a building's base is seen, reveal its whole sprite footprint so the
+    // fog doesn't black out the (tall) upper half of the structure.
+    for (const b of this.buildings) {
+      if (!b.alive) continue
+      if (b.side === 'player' || this.fog.isExplored(b.x, b.y)) {
+        const w = b.size * 1.45
+        this.fog.exploreRect(b.x - w / 2, b.y - w * 0.62, b.x + w / 2, b.y + w * 0.45)
+      }
+    }
 
     const pos = this.squad.pos()
     if (pos) this.camera.follow(pos.x, pos.y, WORLD_W, WORLD_H, dt)

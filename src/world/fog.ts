@@ -65,6 +65,23 @@ export class Fog {
     this.state.fill(EXPLORED)
   }
 
+  /**
+   * Mark a world-space rectangle as at least explored. Used so a building's
+   * tall sprite isn't sliced in half by fog covering the cells above its base.
+   */
+  exploreRect(left: number, top: number, right: number, bottom: number) {
+    const gx0 = Math.max(0, Math.floor(left / FOG_CELL))
+    const gy0 = Math.max(0, Math.floor(top / FOG_CELL))
+    const gx1 = Math.min(this.cols - 1, Math.floor(right / FOG_CELL))
+    const gy1 = Math.min(this.rows - 1, Math.floor(bottom / FOG_CELL))
+    for (let gy = gy0; gy <= gy1; gy++) {
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const i = gy * this.cols + gx
+        if (this.state[i] === UNSEEN) this.state[i] = EXPLORED
+      }
+    }
+  }
+
   render(ctx: CanvasRenderingContext2D) {
     const c = this.ctx
     c.clearRect(0, 0, this.cols, this.rows)
