@@ -32,7 +32,8 @@ export class Terrain {
   base: HTMLCanvasElement
   decals: HTMLCanvasElement
   private dctx: CanvasRenderingContext2D
-  trees: { x: number; y: number }[] = []
+  /** Walkable trees: canopy is drawn over units and grants concealment (r = cover radius). */
+  trees: { x: number; y: number; r: number; sp: Sprite | null; w: number; h: number }[] = []
 
   constructor(
     public w: number,
@@ -83,7 +84,8 @@ export class Terrain {
   /**
    * Trees and bushes, baked on top of either paint path. Uses the chabull
    * top-down pack (CC-BY 3.0) when loaded; procedural blobs otherwise.
-   * Bushes are cosmetic; trees block their cell (see markBlocked).
+   * Bushes are baked here; tree canopies are collected for an overlay pass
+   * (renderCanopies) and grant concealment (inCover) — both walkable.
    */
   private paintFlora(ctx: CanvasRenderingContext2D, rng: RNG, layout: Layout) {
     const sprites = art.trees
@@ -110,29 +112,48 @@ export class Terrain {
       }
     }
 
+    // Trees: bake only the ground shadow here; the canopy is drawn over the
+    // units later (renderCanopies) so the squad reads as walking *underneath* it.
+    const pool = large.length > 0 ? large : sprites
     for (const t of layout.trees) {
       ctx.fillStyle = 'rgba(0,0,0,0.28)'
       ctx.beginPath()
       ctx.ellipse(t.x + 5, t.y + 7, 22, 9, 0, 0, Math.PI * 2)
       ctx.fill()
-      const pool = large.length > 0 ? large : sprites
-      if (pool.length > 0) {
-        const sp = pool[rng.int(0, pool.length - 1)]
-        const w = rng.range(52, 80)
-        const h = (w * sp.h) / sp.w
-        ctx.drawImage(sp.c, t.x - w / 2, t.y - h / 2, w, h)
+      const sp = pool.length > 0 ? pool[rng.int(0, pool.length - 1)] : null
+      const w = rng.range(58, 88)
+      const h = sp ? (w * sp.h) / sp.w : w
+      // Cover radius a touch under the visible canopy: you must really be in it.
+      this.trees.push({ x: t.x, y: t.y, r: w * 0.34, sp, w, h })
+    }
+  }
+
+  /** Tree canopies, drawn after entities so units hide beneath the foliage. */
+  renderCanopies(ctx: CanvasRenderingContext2D) {
+    for (const t of this.trees) {
+      if (t.sp) {
+        ctx.drawImage(t.sp.c, t.x - t.w / 2, t.y - t.h / 2, t.w, t.h)
       } else {
-        ctx.fillStyle = '#4a3318'
-        ctx.fillRect(t.x - 2, t.y - 2, 4, 8)
-        const greens = ['#1e4d17', '#266018', '#2d6e1d']
-        for (let b = 0; b < 5; b++) {
-          ctx.fillStyle = greens[b % greens.length]
-          ctx.beginPath()
-          ctx.arc(t.x + rng.range(-7, 7), t.y - 6 + rng.range(-6, 6), rng.range(6, 11), 0, Math.PI * 2)
-          ctx.fill()
-        }
+        ctx.fillStyle = '#1e4d17'
+        ctx.beginPath()
+        ctx.arc(t.x, t.y, t.w * 0.42, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#2d6e1d'
+        ctx.beginPath()
+        ctx.arc(t.x - t.w * 0.12, t.y - t.h * 0.12, t.w * 0.3, 0, Math.PI * 2)
+        ctx.fill()
       }
     }
+  }
+
+  /** Is this point under a tree canopy? Grants concealment from enemy fire. */
+  inCover(x: number, y: number): boolean {
+    for (const t of this.trees) {
+      const dx = x - t.x
+      const dy = y - t.y
+      if (dx * dx + dy * dy < t.r * t.r) return true
+    }
+    return false
   }
 
   private computeLayout(rng: RNG): Layout {
@@ -208,13 +229,7 @@ export class Terrain {
         }
       }
     }
-    for (const t of layout.trees) {
-      const cx = Math.floor(t.x / TILE)
-      const cy = Math.floor(t.y / TILE)
-      if (this.blocked[this.cellIdx(cx, cy)]) continue
-      this.trees.push(t)
-      this.blocked[this.cellIdx(cx, cy)] = 1
-    }
+    // Trees are walkable now (you hide *under* them) — only lakes block.
   }
 
   // -- AI tileset painting ------------------------------------------------

@@ -770,8 +770,9 @@ export class Game {
 
   private updateEnemies(dt: number) {
     const playerPos = this.squad.pos()
+    const concealed = !this.squad.mounted() && playerPos ? this.terrain.inCover(playerPos.x, playerPos.y) : false
     for (const sq of this.enemySquads) {
-      sq.update(dt, playerPos, this.blockTest, (s, tx, ty) => this.soldierFire(s, tx, ty))
+      sq.update(dt, playerPos, concealed, this.blockTest, (s, tx, ty) => this.soldierFire(s, tx, ty))
     }
     this.enemySquads = this.enemySquads.filter((sq) => sq.alive().length > 0)
 
@@ -782,9 +783,11 @@ export class Game {
         const d = dist(v.x, v.y, playerPos.x, playerPos.y)
         if (d < 520 && d > 270) v.orderMove(playerPos.x, playerPos.y)
         else if (d <= 270) v.stop()
-        if (d < v.stats.range + 40) {
+        // Tanks can't draw a bead on a squad tucked into the treeline.
+        if (d < v.stats.range + 40 && !(concealed && d > 150)) {
           v.turretAngle = angleTo(v.x, v.y, playerPos.x, playerPos.y)
-          this.vehicleFire(v, playerPos.x + rnd(-25, 25), playerPos.y + rnd(-25, 25))
+          const spread = concealed ? 30 : 25
+          this.vehicleFire(v, playerPos.x + rnd(-spread, spread), playerPos.y + rnd(-spread, spread))
         }
       }
     }
@@ -828,7 +831,8 @@ export class Game {
         }
       } else if (b.type === 'etower' && playerPos) {
         const d = dist(b.x, b.y, playerPos.x, playerPos.y)
-        if (d < 310) {
+        const concealed = !this.squad.mounted() && this.terrain.inCover(playerPos.x, playerPos.y)
+        if (d < 310 && !(concealed && d > 120)) {
           b.turretAngle = angleTo(b.x, b.y, playerPos.x, playerPos.y)
           if (b.fireCd <= 0) {
             b.fireCd = 0.5
@@ -1222,6 +1226,8 @@ export class Game {
         if (this.fog.isVisible(s.x, s.y)) s.render(ctx)
       }
     }
+    // Tree canopies sit above units, so the squad reads as hidden underneath.
+    this.terrain.renderCanopies(ctx)
     for (const g of this.grenades) g.render(ctx, this.time)
     for (const b of this.bullets) b.render(ctx)
     this.fx.render(ctx)

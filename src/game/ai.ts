@@ -44,16 +44,26 @@ export class EnemySquad {
 
   /**
    * @param playerPos squad/vehicle position of the player, or null
+   * @param playerConcealed player is under tree cover — much harder to spot/hit
    * @param fire callback(soldier, tx, ty) that spawns a bullet
    */
-  update(dt: number, playerPos: AiTarget | null, isBlocked: (x: number, y: number) => boolean, fire: (s: Soldier, tx: number, ty: number) => void) {
+  update(
+    dt: number,
+    playerPos: AiTarget | null,
+    playerConcealed: boolean,
+    isBlocked: (x: number, y: number) => boolean,
+    fire: (s: Soldier, tx: number, ty: number) => void,
+  ) {
     const units = this.alive()
     if (units.length === 0) return
     const c = this.center()!
     this.repathCd -= dt
+    // Concealed players are only noticed up close, and can't be shot from range.
+    const spotRange = playerConcealed ? 110 : 300
+    const engageRange = playerConcealed ? 130 : 10000
 
     if (this.state === 'patrol') {
-      if (playerPos && dist(c.x, c.y, playerPos.x, playerPos.y) < 300) {
+      if (playerPos && dist(c.x, c.y, playerPos.x, playerPos.y) < spotRange) {
         this.alert()
       } else if (this.waypoints.length > 0) {
         const wp = this.waypoints[this.wpIdx]
@@ -69,18 +79,26 @@ export class EnemySquad {
     }
 
     if (this.state === 'attack' && playerPos) {
-      for (const s of units) {
-        const d = dist(s.x, s.y, playerPos.x, playerPos.y)
-        if (d > s.range() * 0.85) {
-          if (this.repathCd <= 0) {
-            s.orderMove(playerPos.x + rnd(-50, 50), playerPos.y + rnd(-50, 50))
-          }
-        } else {
-          s.stop()
-          s.angle = Math.atan2(playerPos.y - s.y, playerPos.x - s.x)
-          if (s.fireCd <= 0) {
-            s.fireCd = rnd(0.45, 0.7)
-            fire(s, playerPos.x, playerPos.y)
+      // Lost them in the trees: stop firing blind and fall back to patrol.
+      if (playerConcealed && dist(c.x, c.y, playerPos.x, playerPos.y) > engageRange) {
+        this.state = 'patrol'
+        for (const s of units) s.stop()
+      } else {
+        for (const s of units) {
+          const d = dist(s.x, s.y, playerPos.x, playerPos.y)
+          if (d > s.range() * 0.85) {
+            if (this.repathCd <= 0) {
+              s.orderMove(playerPos.x + rnd(-50, 50), playerPos.y + rnd(-50, 50))
+            }
+          } else if (!playerConcealed || d < engageRange) {
+            s.stop()
+            s.angle = Math.atan2(playerPos.y - s.y, playerPos.x - s.x)
+            if (s.fireCd <= 0) {
+              // Concealed targets draw sloppier, less frequent fire.
+              s.fireCd = playerConcealed ? rnd(0.8, 1.2) : rnd(0.45, 0.7)
+              const spread = playerConcealed ? 22 : 0
+              fire(s, playerPos.x + rnd(-spread, spread), playerPos.y + rnd(-spread, spread))
+            }
           }
         }
       }
