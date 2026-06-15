@@ -648,6 +648,16 @@ export class Game {
       sfx.click()
       this.screen = 'boothill'
     }
+    // Level select: number keys 1..N jump straight to that mission with a
+    // fresh squad (startCampaign only auto-resets the squad for mission 0).
+    for (let n = 1; n <= MISSIONS.length; n++) {
+      if (this.input.pressed(String(n))) {
+        sfx.click()
+        this.squad = new Squad()
+        this.roster = new Roster()
+        this.startCampaign(n - 1)
+      }
+    }
   }
 
   private updatePlaying(dt: number) {

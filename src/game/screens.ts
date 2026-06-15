@@ -2,7 +2,7 @@ import type { Game } from './game'
 import { VIEW_W, VIEW_H } from './game'
 import { MISSIONS } from './missions'
 import { loadGraves, rankName } from './roster'
-import { music } from '../core/audio'
+import { music, titleMusic } from '../core/audio'
 import { art } from '../core/art'
 
 const FONT = "'Courier New', monospace"
@@ -116,12 +116,25 @@ function drawTitle(g: Game, ctx: CanvasRenderingContext2D) {
   y += 32
   ctx.fillText('[B]  BOOT HILL \u2014 honour the dead', VIEW_W / 2, y)
   y += 32
-  ctx.fillText(`[M]  MUSIC: ${music.on ? 'ON' : 'OFF'}`, VIEW_W / 2, y)
+  ctx.fillText(`[M]  MUSIC: ${titleMusic.on ? 'ON' : 'OFF'}`, VIEW_W / 2, y)
+
+  // Stage select: jump straight to any mission with a fresh squad.
+  y += 38
+  ctx.fillStyle = '#ffe14a'
+  ctx.font = `bold 14px ${FONT}`
+  ctx.fillText('SELECT STAGE \u2014 press a number', VIEW_W / 2, y)
+  y += 24
+  ctx.font = `13px ${FONT}`
+  ctx.fillStyle = '#9fb886'
+  for (let i = 0; i < MISSIONS.length; i++) {
+    ctx.fillText(`[${i + 1}]  ${MISSIONS[i].name}`, VIEW_W / 2, y)
+    y += 22
+  }
 
   if (g.progress.highScore > 0) {
     ctx.fillStyle = '#ff9966'
     ctx.font = `14px ${FONT}`
-    ctx.fillText(`ENDLESS RECORD: ${g.progress.highScore} KILLS`, VIEW_W / 2, y + 44)
+    ctx.fillText(`ENDLESS RECORD: ${g.progress.highScore} KILLS`, VIEW_W / 2, y + 16)
   }
 
   ctx.font = `11px ${FONT}`
