@@ -184,10 +184,13 @@ class ArtStore {
   trees: Sprite[] = []
 
   async load() {
+    // Prefix with the Vite base so assets resolve under a sub-path too
+    // (GitHub Pages /huhhuhgame/) as well as at a domain root (Netlify).
+    const B = import.meta.env.BASE_URL
     const [sheet, sheet2, tilesImg] = await Promise.all([
-      loadImage('/art/sheet.png'),
-      loadImage('/art/sheet2.png'),
-      loadImage('/art/tiles.png'),
+      loadImage(`${B}art/sheet.png`),
+      loadImage(`${B}art/sheet2.png`),
+      loadImage(`${B}art/tiles.png`),
     ])
 
     // The pack numbers its files with gaps: 01–30, 38–44, 46–55.
@@ -195,7 +198,7 @@ class ArtStore {
       .concat([38, 39, 40, 41, 42, 43, 44])
       .concat([...Array(10).keys()].map((i) => i + 46))
     const treeImgs = await Promise.all(
-      treeNums.map((n) => loadImage(`/art/trees/tree_${String(n).padStart(2, '0')}.png`)),
+      treeNums.map((n) => loadImage(`${B}art/trees/tree_${String(n).padStart(2, '0')}.png`)),
     )
     for (const img of treeImgs) {
       if (img) this.trees.push(makeCanvasFromRegion(img, 0, 0, img.width, img.height))

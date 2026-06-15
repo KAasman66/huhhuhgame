@@ -216,7 +216,7 @@ let titleWant = false
 
 function titleAudio(): HTMLAudioElement {
   if (!titleEl) {
-    titleEl = new Audio('/audio/title.mp3')
+    titleEl = new Audio(`${import.meta.env.BASE_URL}audio/title.mp3`)
     titleEl.loop = true
     titleEl.volume = 0.6
   }
@@ -247,7 +247,9 @@ export const titleMusic = {
 // (level 1→track1, 2→track2, 3→track3, 4→track1, ...). Looped HTMLAudio.
 // ---------------------------------------------------------------------------
 
-const LEVEL_TRACKS = ['/audio/level1.mp3', '/audio/level2.mp3', '/audio/level3.mp3']
+const LEVEL_TRACKS = ['level1.mp3', 'level2.mp3', 'level3.mp3'].map(
+  (f) => `${import.meta.env.BASE_URL}audio/${f}`,
+)
 const levelEls: (HTMLAudioElement | null)[] = [null, null, null]
 let curTrack: HTMLAudioElement | null = null
 let curIdx = 0
