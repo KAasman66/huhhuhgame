@@ -65,7 +65,7 @@ src/
 │   ├── math.ts          Seeded RNG (mulberry32), dist/clamp/lerp
 │   ├── input.ts         Keyboard + muis; CSS-scale compensatie
 │   ├── camera.ts        Smooth follow + screen shake
-│   ├── audio.ts         WebAudio synth SFX + dark muziekloop
+│   ├── audio.ts         WebAudio synth SFX + dark muziekloop + titel-mp3 (public/audio/title.mp3)
 │   └── fx.ts            Particles, floating text, stampt decals
 ├── world/
 │   ├── terrain.ts       Procedurele map + AI-tileset paint; permanente decal-layer

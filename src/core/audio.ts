@@ -195,6 +195,50 @@ function scheduleStep(t: number, i: number) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Title music: a real track (public/audio/title.mp3), looped. Browser autoplay
+// rules mean it can only start after a user gesture, so we retry on first input.
+// ---------------------------------------------------------------------------
+
+let titleEl: HTMLAudioElement | null = null
+let titleWant = false
+
+function titleAudio(): HTMLAudioElement {
+  if (!titleEl) {
+    titleEl = new Audio('/audio/title.mp3')
+    titleEl.loop = true
+    titleEl.volume = 0.6
+  }
+  return titleEl
+}
+
+export const titleMusic = {
+  play() {
+    titleWant = true
+    titleAudio().play().catch(() => {
+      /* blocked until a user gesture — the unlock listener will retry */
+    })
+  },
+  stop() {
+    titleWant = false
+    if (titleEl) {
+      titleEl.pause()
+      titleEl.currentTime = 0
+    }
+  },
+  get on() {
+    return titleWant
+  },
+}
+
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    if (titleWant && titleEl && titleEl.paused) titleEl.play().catch(() => {})
+  }
+  window.addEventListener('pointerdown', unlock)
+  window.addEventListener('keydown', unlock)
+}
+
 export const music = {
   get on() {
     return musicOn

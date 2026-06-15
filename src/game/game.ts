@@ -1,7 +1,7 @@
 import { Camera } from '../core/camera'
 import { Input } from '../core/input'
 import { FX } from '../core/fx'
-import { music, sfx } from '../core/audio'
+import { music, sfx, titleMusic } from '../core/audio'
 import { clamp, dist, rnd, rndPick, RNG, angleTo } from '../core/math'
 import { Terrain } from '../world/terrain'
 import { Fog } from '../world/fog'
@@ -34,6 +34,7 @@ export class Game {
   camera = new Camera(VIEW_W, VIEW_H)
   fx = new FX()
   screen: Screen = 'title'
+  private prevScreen: Screen | null = null
   time = 0
 
   // Mission state
@@ -545,7 +546,10 @@ export class Game {
   update(dt: number) {
     this.time += dt
     if (this.flashA > 0) this.flashA = Math.max(0, this.flashA - dt * 2.2)
-    if (this.input.pressed('m')) music.toggle()
+    if (this.input.pressed('m')) {
+      if (this.screen === 'title') titleMusic.on ? titleMusic.stop() : titleMusic.play()
+      else music.toggle()
+    }
 
     switch (this.screen) {
       case 'title':
@@ -608,7 +612,22 @@ export class Game {
         if (this.input.pressed('escape') || this.input.pressed('b')) this.screen = 'title'
         break
     }
+
+    this.handleMusicTransitions()
     this.input.endFrame()
+  }
+
+  /** Title track plays on the title screen; the synth loop plays in-mission. */
+  private handleMusicTransitions() {
+    if (this.screen !== this.prevScreen) {
+      if (this.screen === 'title') {
+        music.stop()
+        titleMusic.play()
+      } else if (this.prevScreen === 'title') {
+        titleMusic.stop()
+      }
+      this.prevScreen = this.screen
+    }
   }
 
   private updateTitle() {
@@ -638,7 +657,8 @@ export class Game {
 
     this.handleOrders(mouseWX, mouseWY)
 
-    // Squad movement
+    // Squad movement: steer followers along the leader's trail, then update.
+    this.squad.steer(dt, this.blockTest)
     for (const s of this.squad.alive()) s.update(dt, this.blockTest)
     if (this.squad.mounted()) {
       const v = this.squad.vehicle!
