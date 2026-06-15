@@ -2,7 +2,9 @@
 
 > **Wat is dit?** Top-down tactical action game. Cannon Fodder (squad + namen + Boot Hill) × Red Alert (economie, bouwen, fog of war) × Postal (gore, burgers, zwarte humor).
 >
-> **Stack:** TypeScript + Vite + Canvas 2D + WebAudio. Geen runtime-dependencies. Graphics zijn hybride: AI-sheets waar beschikbaar, anders procedureel.
+> **Stack:** TypeScript + Vite + Canvas 2D + WebAudio. Geen runtime-dependencies. Graphics: AI-sheets + echte tree-PNGs, met procedural fallback. Muziek: echte mp3-tracks, SFX procedureel.
+>
+> **Repo:** https://github.com/KAasman66/huhhuhgame (branch `main`).
 
 ---
 
@@ -11,29 +13,31 @@
 ```bash
 cd D:\PROJECTS2025\screener-game
 npm install
-npm run dev          # → http://localhost:5173 (5174 als 5173 bezet)
+npm run dev          # → http://localhost:5173 (pakt 5174+ als bezet)
 npm run typecheck    # tsc --noEmit — hoort schoon
+npm run build        # productie-build naar dist/
 ```
 
-Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill · **M** = muziek
+Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill.
 
 ---
 
-## Status (13 jun 2026 — sessie 2)
+## Status (15 jun 2026 — sessie 5)
 
 | Onderdeel | Status |
 |---|---|
-| Core gameplay (move/fire/grenades/formations) | ✅ Werkt |
-| 5-missie campagne + endless mode | ✅ Werkt |
-| Economie, bouwen, voertuigen (instappen) | ✅ Werkt |
-| Fog of war, minimap, persistent gore/decals | ✅ Werkt |
-| Boot Hill + localStorage progress | ✅ Werkt |
-| Procedural audio + muziekloop | ✅ Werkt |
-| AI title art (`sheet.png`) | ✅ Werkt |
-| AI terrain tiles (`tiles.png`) | ✅ Werkt |
-| AI sprite slicing (sheet2.png) | ✅ Gehard — crash gefixt, per-parser try/catch |
-| GitHub remote `KAasman66/huhhuhgame` | ⚠️ User moet `git remote add` + push handmatig draaien |
-| Oude `.js` bestanden in `src/` | ✅ Niet aanwezig (al opgeruimd in reboot) |
+| Core gameplay (move/fire/grenades/formations) | ✅ |
+| 5-missie campagne + endless mode | ✅ |
+| Economie, bouwen, voertuigen (instappen) | ✅ |
+| Fog of war, minimap, persistent gore/decals | ✅ |
+| Boot Hill + localStorage progress | ✅ |
+| AI title/tiles/sprites art (sheet.png, sheet2.png, tiles.png) | ✅ geverifieerd: playerPoses 4, enemyPoses 4, vehicles 4, buildings 6, tiles 8 |
+| Echte bomen/struiken (CC-BY 3.0) + bos = dekking | ✅ |
+| A* pathfinding + cohesieve squad-follow | ✅ |
+| Per-level muziek (mp3) + titel-mp3 | ✅ |
+| Gunfire + gevarieerde hit-grunts | ✅ |
+| GitHub remote + push | ✅ staat erop |
+| Netlify deploy-config | ✅ `netlify.toml` aanwezig (zie Deploy) |
 
 ---
 
@@ -46,12 +50,11 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill · **M** = 
 | **G** | Granaat (leader gooit) |
 | **S** | Formatie wisselen (column ↔ spread) |
 | **E** | Shop (towers/barracks/factory/recruits/vehicles) |
-| **SPACE** | Uit voertuig stappen |
-| **M** | Muziek aan/uit |
+| **SPACE** | Uit voertuig stappen; bevestig briefing/debrief |
 | **P** | Pauze aan/uit |
-| **ESC** | Annuleer build-mode / sluit menu |
+| **M** | Muziek aan/uit (titel = mp3, in-game = level-track) |
+| **ESC** | Annuleer build-mode / sluit menu / terug naar titel |
 | **R** | Retry na game over |
-| **N** | — (niet actief; SPACE op debrief = volgende missie) |
 
 ---
 
@@ -59,29 +62,29 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill · **M** = 
 
 ```
 src/
-├── main.ts              Game loop; wacht op art.load() vóór start
+├── main.ts              Game loop (rAF, dt-clamp); wacht op art.load() vóór start
 ├── core/
-│   ├── art.ts           ★ AI-sheet loader + sprite slicer (NIEUW, uncommitted)
+│   ├── art.ts           AI-sheet loader + sprite slicer + tree-PNG loader
 │   ├── math.ts          Seeded RNG (mulberry32), dist/clamp/lerp
 │   ├── input.ts         Keyboard + muis; CSS-scale compensatie
 │   ├── camera.ts        Smooth follow + screen shake
-│   ├── audio.ts         WebAudio synth SFX + dark muziekloop + titel-mp3 (public/audio/title.mp3)
+│   ├── audio.ts         Procedurele SFX + grunts; mp3-muziek (titel + per level)
 │   └── fx.ts            Particles, floating text, stampt decals
 ├── world/
-│   ├── terrain.ts       Procedurele map + AI-tileset paint; permanente decal-layer
-│   ├── path.ts          A* + string-pulling over terrain grid (sessie 3)
-│   └── fog.ts           Grid-based fog (40px cells, soft edges)
+│   ├── terrain.ts       Procedurele map + AI-tileset paint; bomen=canopy+cover; decal-layer
+│   ├── path.ts          Grid A* (octile, binary heap) + string-pulling
+│   └── fog.ts           Grid fog (40px); exploreRect onthult gebouw-footprints
 ├── entities/
-│   ├── soldier.ts       Namen, rangen, AI-sprite of procedural fallback
-│   ├── vehicle.ts       Jeep/tank, instapbaar, AI-sprite fallback
+│   ├── soldier.ts       Namen, rangen, route[]/orderPath, AI-sprite of procedural
+│   ├── vehicle.ts       Jeep/tank, instapbaar, route[]/orderPath
 │   ├── building.ts      6 types, AI-sprite fallback
 │   ├── projectile.ts    Bullet + Grenade (arc + boom)
 │   ├── civilian.ts      Paniek, follow, rescue
 │   └── pickup.ts        Cash / medkit / grenades
 └── game/
-    ├── game.ts          ★ Orkestratie (~1100 regels): update, collision, win/lose
-    ├── squad.ts         Formaties, mount/dismount
-    ├── ai.ts            Enemy patrol → attack
+    ├── game.ts          ★ Orkestratie (~1300 regels): update, collision, win/lose, fog, muziek-transities
+    ├── squad.ts         ★ Leider-A* + breadcrumb-follow + separatie
+    ├── ai.ts            Enemy patrol → attack; respecteert dekking (concealment)
     ├── missions.ts      5 missies + endless config
     ├── roster.ts        Namen, Boot Hill graves, campaign progress (localStorage)
     ├── hud.ts           Top bar, squad panel, minimap, build menu
@@ -92,188 +95,95 @@ src/
 
 **Resolutie:** canvas intern 1280×720, CSS schaalt 16:9. Wereld 2400×1500.
 
-**Debug handles (browser console):**
-- `window.game` — live GameState
-- `window.__art` — geladen sprites + `art.summary()`
+**Debug handles (browser console):** `window.game` (live GameState), `window.__art` (`art.summary()`).
 
 ---
 
-## AI-art integratie
+## Belangrijkste systemen (recent werk)
 
-### Bestanden
+### Pathfinding & squad-beweging (`world/path.ts`, `game/squad.ts`)
+- Grid A* over terrein-cellen (TILE=30, octile heuristiek, binary heap, geen corner-cutting) + string-pulling zodat units bochten afsnijden i.p.v. zigzaggen.
+- Klik op water/gebouw → herroutet naar dichtstbijzijnde begaanbare cel.
+- **Alleen de leider doet A*.** Volgers chasen een **breadcrumb-spoor** (`Squad.steer`, elke frame vóór de soldier-updates) → de hele squad rijgt single-file door hetzelfde gat. Kolom = gelijkmatig achter elkaar; spread = + zijwaartse waaier (geklemd op open terrein). Lichte pairwise separatie tegen stapelen. 1× A* per order i.p.v. 8.
+
+### Bos = dekking (`world/terrain.ts`, `game/ai.ts`)
+- Bomen zijn **beloopbaar** (niet meer geblokkeerd; alleen meren blokkeren). Canopy wordt ná de units getekend (`renderCanopies`) → je verdwijnt eronder.
+- `terrain.inCover(x,y)` = onder een kruin. Vijand-AI: spot-range 300→110 onder dekking; al-alerte squad valt terug naar patrol als je >130px de bomen in glipt; schoten trager+wijder. Tanks/torens stoppen met vuren op verstopte squad voorbij ~150/120px.
+
+### Game-feel (`game/game.ts`, `core/camera.ts`)
+- **Hitstop** (`freeze`, ≤120ms) bij zware klappen; **screen-flash** (`flash`) rood bij eigen schade, amber bij grote explosies/sloop; **low-HP vignette** (pulserend rood randje). **Pauze** met P.
+
+### Audio (`core/audio.ts`)
+- **Muziek = echte mp3's.** Titel: `public/audio/title.mp3`. In-game: per level cyclisch — `music.playLevel(missionIdx)` → `level{1,2,3}.mp3`, level 4 weer level1, enz. Autoplay-unlock retry op eerste toets/klik (browser-policy). 'M' togglet de juiste track per screen.
+- **SFX procedureel:** gunfire = crack + body + click met per-schot pitch-variatie. `sfx.grunt()` = gevarieerde "ah/uh/eh/oh" (randomiseert fundament/formanten/lengte/pitch-drop) bij niet-dodelijke treffers. Dodelijk = scream + gibs.
+
+---
+
+## Assets
 
 | Pad | Rol |
 |---|---|
-| `public/art/sheet.png` | Title key art (bovenste ~45%) + embedded sprites/tiles |
-| `public/art/sheet2.png` | Alternatief sheet; **sprites rechts in 4×4 grid** (preferred voor slicing) |
-| `public/art/tiles.png` | 9×6 tile-atlas (grass, dirt, water, forest, bomen, etc.) |
-| `public/art/trees/` | 47 top-down boom/struik PNGs (chabull, opengameart, **CC-BY 3.0** — credit staat in README) |
-| `art/` (root) | Bron-images van ChatGPT/Gemini — **niet automatisch geladen**; kopieer naar `public/art/` (gegitignored) |
+| `public/art/sheet.png` | Title key art + embedded sprites/tiles |
+| `public/art/sheet2.png` | Sprites rechts in 4×4 grid (preferred voor slicing) |
+| `public/art/tiles.png` | 9×6 tile-atlas (grass/dirt/water/forest) |
+| `public/art/trees/` | 47 top-down boom/struik PNGs (chabull, opengameart, **CC-BY 3.0**, credit in README) |
+| `public/audio/title.mp3` | Titelmuziek (Stoppadawar) |
+| `public/audio/level{1,2,3}.mp3` | Level-muziek (RAWONON / SWOEWM / RuimteNietBeschikbaar) |
+| `art/` (root) | Bron-images — **niet geladen**, `/art/` is gegitignored |
 
-Vite serveert `public/` statisch op `/art/...`.
-
-### Hoe het werkt (`src/core/art.ts`)
-
-1. `art.load()` draait vóór game-start (`main.ts`)
-2. Title panorama uit `sheet.png` (of `sheet2.png` fallback)
-3. Sprites: grid-slice uit `sheet2.png` rechterkolom (4 rijen × 4 kolommen)
-   - Rij 1: groene soldaten (walk/idle/fire poses)
-   - Rij 2: rode soldaten
-   - Rij 3: jeep, groene tank, rode tank
-   - Rij 4: tower, barracks, factory, HQ
-4. Tiles: `tiles.png` 9×6 grid → grass/dirt/water/forest arrays
-5. Checkerboard-background wordt verwijderd via border flood-fill
-6. Enemy-varianten: `tinted()` kopie met rode overlay (jeep/tower/barracks)
-7. **Fallback:** als sprite ontbreekt, teken entity procedureel (oude canvas-draws blijven intact)
-
-### Bekende art-problemen
-
-- Eerste parser (connected-components) vond wel tiles + title, maar **miste vehicles/buildings** (te agressief mergen)
-- Verbeterde grid-slicer in `art.ts` is geschreven maar **nog niet gecommit** — test in browser met `__art.summary()`:
-  ```js
-  __art.summary()
-  // verwacht: playerPoses: 4, enemyPoses: 4, vehicles: 4, buildings: 6
-  ```
-- Terrain wordt gegenereerd bij mission-load; art moet klaar zijn (gebeurt automatisch via `art.load().then(...)`)
-- Minimap-thumbnail wordt uit terrain.base getekend vóór decals — OK
+Vite serveert `public/` statisch op `/art/...` en `/audio/...` (absolute paden — zie Deploy).
 
 ---
 
-## Gameplay-regels (belangrijk voor bugs/features)
+## Gameplay-regels
 
-- **Friendly fire:** kogels raken alleen vijand + civilians. **Explosies raken iedereen** (inclusief eigen squad).
-- **Civilians:** loop erheen → volgen. Evac-zone = +$400. Dood = -$200 + "YOU MONSTER".
-- **Doden:** blood/gibs/corpses worden **gestampt in terrain decal-canvas** (blijft op de map).
-- **Promoties:** kills → rank up (PVT/CPL/SGT/CPT) → sneller vuren. Veteranen gaan mee naar volgende missie.
-- **Boot Hill:** elke KIA → grave in `localStorage` key `chaosfodder.boothill`. Progress in `chaosfodder.progress`.
-- **Fog:** alleen rendering/minimap; enemy AI schiet ook buiten zicht.
-
----
+- **Friendly fire:** kogels raken vijand + civilians; **explosies raken iedereen** (ook eigen squad).
+- **Civilians:** loop erheen → volgen. Evac = +$400. Dood = -$200 + quip.
+- **Doden:** blood/gibs/corpses worden in de terrein-decal-canvas gestampt (blijven liggen).
+- **Promoties:** kills → rank (PVT/CPL/SGT/CPT) → sneller vuren; veteranen gaan mee.
+- **Boot Hill:** elke KIA → grave in `localStorage` `chaosfodder.boothill`; progress in `chaosfodder.progress`.
 
 ## Campagne
 
 | # | Naam | Doel | Unlocks |
 |---|---|---|---|
 | 1 | FIRST BLOOD | Elimineer alle patrols | — |
-| 2 | GOOD SAMARITAN | Red 4 civilians naar evac | — |
+| 2 | GOOD SAMARITAN | Red civilians naar evac | — |
 | 3 | URBAN RENEWAL | Vernietig enemy HQ | Bouwen |
-| 4 | HOLD THE LINE | Overleef 6 waves | Voertuigen |
+| 4 | HOLD THE LINE | Overleef waves | Voertuigen |
 | 5 | TOTAL CHAOS | HQ + alle enemy barracks | Alles |
 
-Endless: `[E]` op title screen. High score in progress.
+Endless: `[E]` op titel. High score in progress.
 
 ---
 
-## Git
+## Deploy
 
-```
-Branch: master (moet hernoemd naar main bij eerste push)
-Laatste commits:
-  c13608d — Fix art loader crash: harden grid slicer + per-parser error isolation
-  b76a595 — Add AI art pipeline: title, tiles, sprite sheets with procedural fallback
-  28d0770 — Full reboot: CHAOS FODDER
-Remote configured: NEE (user moet zelf draaien — zie hieronder)
-Target repo: https://github.com/KAasman66/huhhuhgame.git
-```
+Statische Vite-build (`npm run build` → `dist/`, ~86KB JS gzip 28KB; `dist/` is gegitignored). **Belangrijk:** assets worden geladen met **absolute paden** (`/art/...`, `/audio/...`).
 
-**Uncommitted (handoff-moment):**
-- `art/` (6 bron-images van ChatGPT/Gemini, ~15MB) — niet automatisch geladen.
-  Optie: gitignore, of verplaats naar `public/art/sources/`. Niet kritiek.
-
-**Eerste push (user moet zelf draaien — `gh` CLI ontbreekt, geen permission voor `winget install`):**
-```bash
-git remote add origin https://github.com/KAasman66/huhhuhgame.git
-git branch -M main
-git push -u origin main
-```
-Auth via Git Credential Manager (browser-popup) of Personal Access Token. **GEEN** `git init` en **GEEN** README aanmaken — repo heeft al history.
+- **Netlify (aanbevolen, nul aanpassingen):** root-domein, dus absolute paden kloppen. `netlify.toml` staat klaar (build=`npm run build`, publish=`dist`, Node 20).
+  - A) app.netlify.com → Import → GitHub → `KAasman66/huhhuhgame` → Deploy (auto-deploy per push).
+  - B) app.netlify.com/drop → sleep `dist/` erin (handmatig, geen Git).
+  - *Account-acties (inloggen/Deploy klikken) doet de user zelf.*
+- **GitHub Pages:** serveert onder `/huhhuhgame/` → absolute `/art`+`/audio` paden **404'en**. Vereist: asset-paden relatief maken (`import.meta.env.BASE_URL`-prefix in `art.ts` + `audio.ts`), `base:'/huhhuhgame/'` in `vite.config.js`, en een Actions deploy-workflow. ~20 min werk; nog niet gedaan.
 
 ---
 
 ## Testen
 
-Handmatig: `npm run dev` → ENTER → SPACE (briefing) → LMB move, RMB fire.
+Handmatig: `npm run dev` → ENTER → SPACE (briefing) → LMB move, RMB hold to fire.
 
-Automated (browser CDP):
-```js
-// Keyboard via dispatch (browser_press_key werkt NIET op window listeners)
-window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))
-
-// Mouse: reken camera-offset mee
-const g = window.game
-const wx = 500, wy = 700  // world coords
-const sx = wx - g.camera.x, sy = wy - g.camera.y
-// ... canvas getBoundingClientRect scaling ...
-```
-
-Getest en werkend: title → briefing → playing, combat/kills/money, build tower, destroy HQ → debrief, buy jeep + mount/dismount, wave spawn, civilian rescue, squad wipe → Boot Hill.
+**Let op — Claude-preview:** de preview-tab is hidden → de browser pauzeert `requestAnimationFrame` → de game-loop staat stil (screenshots/keys werken niet vanzelf). Synchrone calls via `preview_eval` werken wél: `g.startCampaign(n); g.screen='playing'; g.update(1/60)` in een lus, dan state uitlezen. Audio kun je niet horen, alleen bevestigen dat bestanden 200 serveren en de logica foutloos draait.
 
 ---
 
-## Volgende stappen (prioriteit)
+## Volgende stappen / openstaand
 
-1. **User: push naar GitHub** — zie Git-sectie hierboven; daarna `git remote -v` bevestigt.
-2. **Sprite slicing visueel verifiëren** — open game in browser, console: `__art.summary()`.
-   Verwacht ruwweg: `{ playerPoses: 3-4, enemyPoses: 3-4, vehicles: 3-4, buildings: 4-6, tiles: 5+ }`.
-   Als een categorie 0 is: `parseSpritesFromSheet2()` grid-coördinaten bijstellen
-   (rx/ry/rw/rh percentages) of overschakelen op handmatige pixel-offsets.
-3. **`art/` root opruimen** — gitignoren of naar `public/art/sources/`. Cosmetisch.
-4. Nice-to-have: gamepad, enemy turret rotation op AI buildings,
-   extra sprite-poses (4-frame walk cycle), enemy AI ook via pathfinder
-   (chase loopt nu nog dom tegen meren aan — speler heeft wél A*).
-
-## Sessie-3 wijzigingen (13 jun 2026)
-
-**GitHub:** remote staat erop, `main` gepusht naar `KAasman66/huhhuhgame`. `art/` is gegitignored.
-
-**Toegevoegd:**
-- `world/path.ts` — grid A* (octile, binary heap, geen corner-cutting) + string-pulling.
-  Klik op water/gebouw → herroutet naar dichtstbijzijnde begaanbare cel.
-  `Squad.pathfinder` wordt in `loadMission` geïnjecteerd; per unit een route.
-  Soldier/Vehicle hebben `route[]` + `orderPath()`; `orderMove()` cleart route → AI ongewijzigd.
-  Gemeten: 10 volledige squad-orders ≈ 5.6ms.
-- Hitstop (`freeze()`) + screenflash (`flash()`) in game.ts — rood bij eigen schade, amber bij grote explosies/sloop.
-- Pauze met **P** (reset bij mission-load).
-- Low-HP vignette (pulserend rood randje; weegt ook mee hoe weinig soldaten er nog leven).
-- **Echte bomen/struiken**: chabull's "Trees and Bushes" pack (CC-BY 3.0) in `public/art/trees/`.
-  `art.trees` laadt 47 PNGs (nummering heeft gaten: 01–30, 38–44, 46–55).
-  `terrain.paintFlora()` bakt ze in de base-canvas: grote sprites = blokkerende bomen,
-  kleine (≤50px) = cosmetische struiken (60 stuks, deels geclusterd rond bomen).
-  Fallback naar procedural blobs als de PNGs ontbreken. Visueel geverifieerd via canvas-crop.
-
-**Let op bij testen via Claude-preview:** de tab is hidden → browser pauzeert `requestAnimationFrame`
-→ game-loop staat stil. Synchrone calls via `preview_eval` (bv. `game.squad.moveTo(...)`) werken wél;
-visuele/frame-afhankelijke checks moeten in een echte voorgrond-browser.
-
-## Sessie-2 wijzigingen (sinds vorige handoff)
-
-**Gefixt:**
-- `RangeError: Invalid array length` crash bij sprite parsing op start (sheet2.png).
-  Oorzaak: `largestInCell` kreeg fractional/negatieve dims als pad ≥ cell/2.
-  Fix: floor dims in `largestInCell` + `sliceGrid`, return null bij ≤0 dims.
-- Sprite-parse crash sloopte óók tile-loading omdat alles in één try/catch zat.
-  Fix: `load()` wrapt elke parser apart.
-- `paintWithTiles` kon crashen als grass-tiles array <4 entries had.
-  Fix: `pickGrass()` clampt indices; terrain valt terug op procedural bij paint-exception.
-- Terrain vereist nu álle vier tile-categories voordat tile-painter aan gaat.
-
-**Niet gedaan:**
-- Sprite slicing kwaliteit niet visueel geverifieerd in deze sessie (geen browser test).
-- GitHub push niet uitgevoerd — `winget install gh` geweigerd door permission;
-  user heeft commando-blok voor handmatige push gekregen.
+1. **Vijand-AI via pathfinder** — achtervolgende vijanden lopen nog dom tegen meren aan; speler heeft wél A*. Per-frame repathing throttlen.
+2. **Audio-mix balans** in een echte browser checken (muziek 0.5, titel 0.6, grunt ~0.16–0.23) — eenvoudig bij te stellen in `audio.ts`.
+3. **GitHub Pages** afmaken als de user dat naast/i.p.v. Netlify wil (zie Deploy).
+4. Nice-to-have: gamepad, enemy turret-rotatie op AI-buildings, 4-frame walk cycle.
 
 ---
 
-## Prompts voor extra AI-art (indien user meer genereert)
-
-**Sprite sheet (prioriteit):** strict top-down, transparent background, 4×4 grid: green soldiers (4 poses), red soldiers (4), jeep + 2 tanks, tower + barracks + factory + HQ. Geen tekst.
-
-**Title art:** night battlefield, soldiers on hill with graves, explosions, NO text (game overlay tekent zelf).
-
-**Tiles:** 9×6 seamless tile atlas — grass, dirt, water, forest, roads, craters. Top-down.
-
-Plaats output in `public/art/` en hernoem desnoods naar `sheet2.png` / `tiles.png`.
-
----
-
-*Geschreven: 13 jun 2026 — sessie 2 na art-integratie crash fix.*
+*Bijgewerkt: 15 jun 2026 — na pathfinding-rewrite, per-level audio, bos-dekking, fog/voertuig-fixes en deploy-config.*
