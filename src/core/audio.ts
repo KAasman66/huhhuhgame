@@ -69,16 +69,85 @@ function tone(type: OscillatorType, f0: number, f1: number, vol: number, dur: nu
   o.stop(t + dur + 0.05)
 }
 
+/**
+ * A short voiced grunt ("ah / argh / oof") for non-fatal hits. Randomises
+ * fundamental, vowel formants, length and pitch-drop every call so it never
+ * sounds like the same clip twice.
+ */
+function grunt() {
+  const a = ac()
+  const t = a.currentTime
+  const f0 = 95 + Math.random() * 95 // 95–190 Hz
+  const dur = 0.16 + Math.random() * 0.18
+  const drop = 0.55 + Math.random() * 0.25
+  // Vowel formant pairs: ah / uh / eh / oh
+  const vowels = [
+    [720, 1100],
+    [600, 1000],
+    [520, 1600],
+    [450, 800],
+  ]
+  const [f1, f2] = vowels[(Math.random() * vowels.length) | 0]
+  const vol = 0.16 + Math.random() * 0.07
+
+  const o = a.createOscillator()
+  o.type = Math.random() < 0.5 ? 'sawtooth' : 'square'
+  o.frequency.setValueAtTime(f0, t)
+  o.frequency.exponentialRampToValueAtTime(Math.max(f0 * drop, 30), t + dur)
+
+  const b1 = a.createBiquadFilter()
+  b1.type = 'bandpass'
+  b1.frequency.value = f1
+  b1.Q.value = 7
+  const b2 = a.createBiquadFilter()
+  b2.type = 'bandpass'
+  b2.frequency.value = f2
+  b2.Q.value = 9
+
+  const g = a.createGain()
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.linearRampToValueAtTime(vol, t + 0.012)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+
+  o.connect(b1).connect(g)
+  o.connect(b2).connect(g)
+  g.connect(out())
+  o.start(t)
+  o.stop(t + dur + 0.05)
+
+  // A little breath/grit on top.
+  const src = a.createBufferSource()
+  src.buffer = noise()
+  const nf = a.createBiquadFilter()
+  nf.type = 'bandpass'
+  nf.frequency.value = f2
+  nf.Q.value = 3
+  const ng = a.createGain()
+  env(ng, t, vol * 0.22, dur * 0.6)
+  src.connect(nf).connect(ng).connect(out())
+  src.start(t)
+  src.stop(t + dur)
+}
+
 export const sfx = {
   unlock() {
     ac()
   },
   shoot() {
-    burst(0.16, 0.07, 'bandpass', 1800, 500)
-    tone('square', 220, 90, 0.05, 0.05)
+    // Crack + body + click, with per-shot pitch variance so rapid fire
+    // doesn't sound like one looped sample.
+    const p = 0.88 + Math.random() * 0.24
+    burst(0.18, 0.055, 'bandpass', 2000 * p, 560 * p)
+    burst(0.13, 0.13, 'lowpass', 680, 110)
+    tone('square', 250 * p, 80, 0.05, 0.05)
   },
   mg() {
-    burst(0.14, 0.05, 'bandpass', 2200, 800)
+    const p = 0.85 + Math.random() * 0.3
+    burst(0.14, 0.045, 'bandpass', 2400 * p, 900)
+    burst(0.08, 0.09, 'lowpass', 560, 130)
+  },
+  grunt() {
+    grunt()
   },
   tankShot() {
     burst(0.35, 0.25, 'lowpass', 900, 120)
@@ -135,65 +204,7 @@ export const sfx = {
   },
 }
 
-// ---------------------------------------------------------------------------
-// Music: minimal dark synth loop (A minor), scheduled with lookahead.
-// ---------------------------------------------------------------------------
-
-const BPM = 96
-const STEP = 60 / BPM / 2 // 8th notes
-const BASS = [55, 55, 0, 55, 65.4, 0, 49, 49, 55, 55, 0, 55, 73.4, 0, 65.4, 49]
-
 let musicOn = false
-let timer: number | null = null
-let nextStep = 0
-let stepIdx = 0
-
-function scheduleStep(t: number, i: number) {
-  const a = ac()
-  // Kick on quarters
-  if (i % 4 === 0) {
-    const o = a.createOscillator()
-    o.type = 'sine'
-    o.frequency.setValueAtTime(120, t)
-    o.frequency.exponentialRampToValueAtTime(40, t + 0.12)
-    const g = a.createGain()
-    g.gain.setValueAtTime(0.22, t)
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.14)
-    o.connect(g).connect(out())
-    o.start(t)
-    o.stop(t + 0.16)
-  }
-  // Hat on off-beats
-  if (i % 2 === 1) {
-    const src = a.createBufferSource()
-    src.buffer = noise()
-    const f = a.createBiquadFilter()
-    f.type = 'highpass'
-    f.frequency.value = 7000
-    const g = a.createGain()
-    g.gain.setValueAtTime(0.04, t)
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.04)
-    src.connect(f).connect(g).connect(out())
-    src.start(t)
-    src.stop(t + 0.06)
-  }
-  // Bass line
-  const f0 = BASS[i % BASS.length]
-  if (f0 > 0) {
-    const o = a.createOscillator()
-    o.type = 'sawtooth'
-    o.frequency.value = f0
-    const fl = a.createBiquadFilter()
-    fl.type = 'lowpass'
-    fl.frequency.value = 350
-    const g = a.createGain()
-    g.gain.setValueAtTime(0.085, t)
-    g.gain.exponentialRampToValueAtTime(0.001, t + STEP * 0.9)
-    o.connect(fl).connect(g).connect(out())
-    o.start(t)
-    o.stop(t + STEP)
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Title music: a real track (public/audio/title.mp3), looped. Browser autoplay
@@ -231,9 +242,30 @@ export const titleMusic = {
   },
 }
 
+// ---------------------------------------------------------------------------
+// In-mission music: one real track per level, cycling every 3 levels
+// (level 1→track1, 2→track2, 3→track3, 4→track1, ...). Looped HTMLAudio.
+// ---------------------------------------------------------------------------
+
+const LEVEL_TRACKS = ['/audio/level1.mp3', '/audio/level2.mp3', '/audio/level3.mp3']
+const levelEls: (HTMLAudioElement | null)[] = [null, null, null]
+let curTrack: HTMLAudioElement | null = null
+let curIdx = 0
+
+function levelAudio(i: number): HTMLAudioElement {
+  if (!levelEls[i]) {
+    const el = new Audio(LEVEL_TRACKS[i])
+    el.loop = true
+    el.volume = 0.5
+    levelEls[i] = el
+  }
+  return levelEls[i]!
+}
+
 if (typeof window !== 'undefined') {
   const unlock = () => {
     if (titleWant && titleEl && titleEl.paused) titleEl.play().catch(() => {})
+    if (musicOn && curTrack && curTrack.paused) curTrack.play().catch(() => {})
   }
   window.addEventListener('pointerdown', unlock)
   window.addEventListener('keydown', unlock)
@@ -243,26 +275,28 @@ export const music = {
   get on() {
     return musicOn
   },
-  start() {
-    if (musicOn) return
+  /** Play the track for a 0-based level index, cycling every 3 levels. */
+  playLevel(level0: number) {
+    const idx = ((level0 % 3) + 3) % 3
     musicOn = true
-    const a = ac()
-    nextStep = a.currentTime + 0.05
-    timer = window.setInterval(() => {
-      const now = ac().currentTime
-      while (nextStep < now + 0.15) {
-        scheduleStep(nextStep, stepIdx)
-        nextStep += STEP
-        stepIdx++
-      }
-    }, 40)
+    const next = levelAudio(idx)
+    if (curTrack && curTrack !== next) {
+      curTrack.pause()
+      curTrack.currentTime = 0
+    }
+    curIdx = idx
+    curTrack = next
+    next.currentTime = 0
+    next.play().catch(() => {
+      /* blocked until a user gesture — the unlock listener retries */
+    })
+  },
+  start() {
+    this.playLevel(curIdx)
   },
   stop() {
     musicOn = false
-    if (timer !== null) {
-      clearInterval(timer)
-      timer = null
-    }
+    if (curTrack) curTrack.pause()
   },
   toggle() {
     musicOn ? music.stop() : music.start()

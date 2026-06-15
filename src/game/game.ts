@@ -563,7 +563,7 @@ export class Game {
           else {
             this.screen = 'playing'
             sfx.click()
-            music.start()
+            music.playLevel(this.missionIdx)
           }
         }
         break
@@ -983,7 +983,7 @@ export class Game {
               sq.alert()
               this.fx.blood(b.x, b.y, Math.atan2(b.vy, b.vx), 5)
               if (s.damage(b.dmg)) this.onSoldierKilled(s, false, b.shooter)
-              else if (Math.random() < 0.3) sfx.hurt()
+              else if (Math.random() < 0.5 && this.camera.sees(s.x, s.y)) sfx.grunt()
               return true
             }
           }
@@ -1014,7 +1014,7 @@ export class Game {
                 this.onSoldierKilled(s, false, null)
               } else {
                 this.flash('#cc1111', 0.14)
-                sfx.hurt()
+                sfx.grunt()
               }
               return true
             }
