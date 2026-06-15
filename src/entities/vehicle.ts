@@ -19,8 +19,8 @@ export interface VehicleStats {
 }
 
 export const VEHICLE_STATS: Record<VehicleType, VehicleStats> = {
-  jeep: { name: 'JEEP', hp: 200, speed: 215, turnRate: 4.2, cost: 700, fireInterval: 0.09, range: 280, dmg: 9, boom: 0, size: 24 },
-  tank: { name: 'TANK', hp: 480, speed: 110, turnRate: 2.4, cost: 1400, fireInterval: 1.1, range: 330, dmg: 70, boom: 55, size: 32 },
+  jeep: { name: 'JEEP', hp: 200, speed: 215, turnRate: 4.2, cost: 550, fireInterval: 0.09, range: 280, dmg: 9, boom: 0, size: 24 },
+  tank: { name: 'TANK', hp: 480, speed: 110, turnRate: 2.4, cost: 1100, fireInterval: 1.1, range: 330, dmg: 70, boom: 55, size: 32 },
 }
 
 function angleDiff(a: number, b: number): number {
