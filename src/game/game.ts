@@ -14,7 +14,7 @@ import { Civilian } from '../entities/civilian'
 import { Pickup } from '../entities/pickup'
 import { Squad } from './squad'
 import { EnemySquad, makeEnemySquad } from './ai'
-import { MISSIONS, ENDLESS, MissionDef } from './missions'
+import { MISSIONS, ENDLESS, MissionDef, STAGE_KEYS } from './missions'
 import { Roster, Grave, addGraves, loadProgress, saveProgress } from './roster'
 import { drawHUD, drawBuildGhost } from './hud'
 import { drawScreens } from './screens'
@@ -35,6 +35,7 @@ export class Game {
   fx = new FX()
   screen: Screen = 'title'
   private prevScreen: Screen | null = null
+  musicEnabled = false // off by default; toggle with M
   time = 0
 
   // Mission state
@@ -547,8 +548,8 @@ export class Game {
     this.time += dt
     if (this.flashA > 0) this.flashA = Math.max(0, this.flashA - dt * 2.2)
     if (this.input.pressed('m')) {
-      if (this.screen === 'title') titleMusic.on ? titleMusic.stop() : titleMusic.play()
-      else music.toggle()
+      this.musicEnabled = !this.musicEnabled
+      this.applyMusic()
     }
 
     switch (this.screen) {
@@ -563,7 +564,6 @@ export class Game {
           else {
             this.screen = 'playing'
             sfx.click()
-            music.playLevel(this.missionIdx)
           }
         }
         break
@@ -617,16 +617,29 @@ export class Game {
     this.input.endFrame()
   }
 
-  /** Title track plays on the title screen; the synth loop plays in-mission. */
   private handleMusicTransitions() {
     if (this.screen !== this.prevScreen) {
-      if (this.screen === 'title') {
-        music.stop()
-        titleMusic.play()
-      } else if (this.prevScreen === 'title') {
-        titleMusic.stop()
-      }
       this.prevScreen = this.screen
+      this.applyMusic()
+    }
+  }
+
+  /**
+   * Single source of truth for what's playing: nothing when music is off,
+   * the level track while playing a mission, the title track otherwise.
+   */
+  private applyMusic() {
+    if (!this.musicEnabled) {
+      titleMusic.stop()
+      music.stop()
+      return
+    }
+    if (this.screen === 'playing') {
+      titleMusic.stop()
+      music.playLevel(this.missionIdx)
+    } else {
+      music.stop()
+      titleMusic.play()
     }
   }
 
@@ -648,14 +661,14 @@ export class Game {
       sfx.click()
       this.screen = 'boothill'
     }
-    // Level select: number keys 1..N jump straight to that mission with a
+    // Level select: STAGE_KEYS[i] jumps straight to that mission with a
     // fresh squad (startCampaign only auto-resets the squad for mission 0).
-    for (let n = 1; n <= MISSIONS.length; n++) {
-      if (this.input.pressed(String(n))) {
+    for (let i = 0; i < MISSIONS.length && i < STAGE_KEYS.length; i++) {
+      if (this.input.pressed(STAGE_KEYS[i])) {
         sfx.click()
         this.squad = new Squad()
         this.roster = new Roster()
-        this.startCampaign(n - 1)
+        this.startCampaign(i)
       }
     }
   }
