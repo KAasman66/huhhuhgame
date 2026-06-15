@@ -1,4 +1,4 @@
-# CHAOS FODDER
+# MEAT GRINDER
 
 > *War is hell. Profit is forever.*
 

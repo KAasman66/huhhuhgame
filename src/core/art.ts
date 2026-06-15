@@ -182,15 +182,24 @@ class ArtStore {
   tiles: { grass: Sprite[]; dirt: Sprite[]; water: Sprite[]; forest: Sprite[] } = { grass: [], dirt: [], water: [], forest: [] }
   /** Top-down tree/bush PNGs (chabull, opengameart.org/content/trees-and-bushes, CC-BY 3.0). */
   trees: Sprite[] = []
+  /** Boot Hill background banner (gravestones are drawn as labelled vectors). */
+  bootHill: Sprite | null = null
+  /** Battlefield prop sprites sliced from the military top-down pack. */
+  props: { barrel: Sprite | null; crate: Sprite | null; sandbag: Sprite | null } = {
+    barrel: null,
+    crate: null,
+    sandbag: null,
+  }
 
   async load() {
     // Prefix with the Vite base so assets resolve under a sub-path too
     // (GitHub Pages /huhhuhgame/) as well as at a domain root (Netlify).
     const B = import.meta.env.BASE_URL
-    const [sheet, sheet2, tilesImg] = await Promise.all([
+    const [sheet, sheet2, tilesImg, bootHillImg] = await Promise.all([
       loadImage(`${B}art/sheet.png`),
       loadImage(`${B}art/sheet2.png`),
       loadImage(`${B}art/tiles.png`),
+      loadImage(`${B}art/boothill.png`),
     ])
 
     // The pack numbers its files with gaps: 01–30, 38–44, 46–55.
@@ -203,6 +212,15 @@ class ArtStore {
     for (const img of treeImgs) {
       if (img) this.trees.push(makeCanvasFromRegion(img, 0, 0, img.width, img.height))
     }
+
+    // Pre-keyed prop sprites (transparent PNGs sliced via scripts/extract-props).
+    const propNames = ['barrel', 'crate', 'sandbag'] as const
+    const propImgs = await Promise.all(propNames.map((n) => loadImage(`${B}art/props/${n}.png`)))
+    propNames.forEach((n, i) => {
+      const img = propImgs[i]
+      if (img) this.props[n] = makeCanvasFromRegion(img, 0, 0, img.width, img.height)
+    })
+
     const safe = (label: string, fn: () => void) => {
       try {
         fn()
@@ -219,6 +237,8 @@ class ArtStore {
     if (tilesImg) safe('tiles', () => this.parseTiles(tilesImg))
     else if (sheet) safe('tiles', () => this.parseEmbeddedTiles(sheet))
 
+    if (bootHillImg) safe('boothill', () => this.parseBootHill(bootHillImg))
+
     this.ready = true
     console.info('[art] loaded', this.summary())
   }
@@ -232,7 +252,19 @@ class ArtStore {
       buildings: Object.keys(this.buildings).length,
       tiles: this.tiles.grass.length + this.tiles.dirt.length,
       trees: this.trees.length,
+      bootHill: !!this.bootHill,
+      props: Object.values(this.props).filter(Boolean).length,
     }
+  }
+
+  /**
+   * boothill.png: use only the wide night-hill banner across the top as the
+   * Boot Hill background. The gravestones themselves are drawn as vector
+   * tombstones in screens.ts so they can carry the real fallen soldier's name
+   * (the bundled stone sprites had wrong baked-in names).
+   */
+  private parseBootHill(img: HTMLImageElement) {
+    this.bootHill = makeCanvasFromRegion(img, 0, 0, img.width, Math.round(img.height * 0.345))
   }
 
   private parseTitleFromSheet(img: HTMLImageElement) {

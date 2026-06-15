@@ -32,8 +32,12 @@ export class Terrain {
   base: HTMLCanvasElement
   decals: HTMLCanvasElement
   private dctx: CanvasRenderingContext2D
-  /** Walkable trees: canopy is drawn over units and grants concealment (r = cover radius). */
-  trees: { x: number; y: number; r: number; sp: Sprite | null; w: number; h: number }[] = []
+  /**
+   * Trees: the canopy is drawn over units and grants concealment (r = cover
+   * radius); the solid trunk (tr = trunk radius) blocks movement so the squad
+   * walks *around / behind* the stem while still passing *under* the leaves.
+   */
+  trees: { x: number; y: number; r: number; tr: number; sp: Sprite | null; w: number; h: number }[] = []
 
   constructor(
     public w: number,
@@ -124,7 +128,8 @@ export class Terrain {
       const w = rng.range(58, 88)
       const h = sp ? (w * sp.h) / sp.w : w
       // Cover radius a touch under the visible canopy: you must really be in it.
-      this.trees.push({ x: t.x, y: t.y, r: w * 0.34, sp, w, h })
+      // Trunk is a small solid core you bump into and slide around.
+      this.trees.push({ x: t.x, y: t.y, r: w * 0.34, tr: Math.min(8, w * 0.07), sp, w, h })
     }
   }
 
@@ -152,6 +157,16 @@ export class Terrain {
       const dx = x - t.x
       const dy = y - t.y
       if (dx * dx + dy * dy < t.r * t.r) return true
+    }
+    return false
+  }
+
+  /** Solid tree trunk: blocks movement so units walk around the stem. */
+  trunkBlocked(x: number, y: number): boolean {
+    for (const t of this.trees) {
+      const dx = x - t.x
+      const dy = y - t.y
+      if (dx * dx + dy * dy < t.tr * t.tr) return true
     }
     return false
   }

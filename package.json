@@ -1,7 +1,7 @@
 {
   "name": "chaos-fodder",
   "version": "2.0.0",
-  "description": "CHAOS FODDER — Cannon Fodder x Red Alert x Postal, fully procedural browser game",
+  "description": "MEAT GRINDER — Cannon Fodder x Red Alert x Postal browser game",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,10 +9,15 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["game", "canvas", "typescript"],
+  "keywords": [
+    "game",
+    "canvas",
+    "typescript"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "pngjs": "^7.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16"
   }

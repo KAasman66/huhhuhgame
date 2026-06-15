@@ -12,10 +12,11 @@ import { Building, BUILDING_STATS, BuildingType } from '../entities/building'
 import { Vehicle, VEHICLE_STATS, VehicleType } from '../entities/vehicle'
 import { Civilian } from '../entities/civilian'
 import { Pickup } from '../entities/pickup'
+import { Prop, PropKind } from '../entities/prop'
 import { Squad } from './squad'
 import { EnemySquad, makeEnemySquad } from './ai'
 import { MISSIONS, ENDLESS, MissionDef, STAGE_KEYS } from './missions'
-import { Roster, Grave, addGraves, loadProgress, saveProgress } from './roster'
+import { Roster, Grave, addGraves, loadProgress, saveProgress, makeGrave, soldierAge, civilianAge, enemyAge } from './roster'
 import { drawHUD, drawBuildGhost } from './hud'
 import { drawScreens } from './screens'
 
@@ -51,6 +52,7 @@ export class Game {
   playerVehicles: Vehicle[] = []
   buildings: Building[] = []
   civilians: Civilian[] = []
+  props: Prop[] = []
   bullets: Bullet[] = []
   missiles: Missile[] = []
   pickups: Pickup[] = []
@@ -71,6 +73,8 @@ export class Game {
   wave = 0
   waveTimer = 0
   casualties: Grave[] = []
+  /** Every death this mission (soldiers, enemies, civilians) for Boot Hill. */
+  private fallen: Grave[] = []
 
   buildMenuOpen = false
   buildMode: BuildingType | null = null
@@ -161,6 +165,7 @@ export class Game {
     this.playerVehicles = []
     this.buildings = []
     this.civilians = []
+    this.props = []
     this.bullets = []
     this.missiles = []
     this.pickups = []
@@ -172,6 +177,7 @@ export class Game {
     this.wave = 0
     this.waveTimer = def.waves ? 10 : 0
     this.casualties = []
+    this.fallen = []
     this.buildMenuOpen = false
     this.buildMode = null
     this.winTimer = -1
@@ -241,6 +247,8 @@ export class Game {
       this.civilians.push(new Civilian(p.x, p.y))
     }
 
+    this.placeProps(rng, spawn)
+
     // Minimap thumbnail
     const mm = document.createElement('canvas')
     mm.width = 192
@@ -261,10 +269,69 @@ export class Game {
 
   blockTest = (x: number, y: number): boolean => {
     if (this.terrain.isBlocked(x, y)) return true
+    if (this.terrain.trunkBlocked(x, y)) return true
     for (const b of this.buildings) {
       if (b.alive && dist(x, y, b.x, b.y) < b.radius() + 8) return true
     }
+    for (const p of this.props) {
+      if (p.alive && dist(x, y, p.x, p.y) < p.r + 6) return true
+    }
     return false
+  }
+
+  /**
+   * Scatter destructible clutter across the battlefield: explosive barrels
+   * (chain reactions), supply crates (cover + loot), sandbag nests and boulders.
+   * They have real collision and depth, so the squad fights around and behind
+   * them. Density scales with mission index for escalating chaos.
+   */
+  private placeProps(rng: RNG, spawn: { x: number; y: number }) {
+    const idx = this.endlessMode ? 6 : this.missionIdx
+    const free = (x: number, y: number, r: number): boolean => {
+      if (x < 40 || y < 40 || x > WORLD_W - 40 || y > WORLD_H - 40) return false
+      if (!this.terrain.areaFree(x, y, r)) return false
+      if (dist(x, y, spawn.x, spawn.y) < 220) return false
+      for (const b of this.buildings) if (b.alive && dist(x, y, b.x, b.y) < b.radius() + r + 14) return false
+      for (const c of this.civilians) if (dist(x, y, c.x, c.y) < r + 18) return false
+      for (const p of this.props) if (dist(x, y, p.x, p.y) < p.r + r + 6) return false
+      return true
+    }
+    const tryPlace = (x: number, y: number, kind: PropKind, tries = 10): boolean => {
+      const r = new Prop(0, 0, kind).r
+      for (let t = 0; t < tries; t++) {
+        const px = clamp(x + rng.range(-90, 90), 40, WORLD_W - 40)
+        const py = clamp(y + rng.range(-90, 90), 40, WORLD_H - 40)
+        if (free(px, py, r)) {
+          this.props.push(new Prop(px, py, kind))
+          return true
+        }
+      }
+      return false
+    }
+
+    // Barrel clusters — the fun stuff. More, and bigger, deeper in the campaign.
+    const clusters = 3 + Math.floor(idx / 2)
+    for (let c = 0; c < clusters; c++) {
+      const cx = rng.range(WORLD_W * 0.35, WORLD_W * 0.92)
+      const cy = rng.range(WORLD_H * 0.12, WORLD_H * 0.88)
+      const n = rng.int(2, 4)
+      for (let i = 0; i < n; i++) tryPlace(cx, cy, 'barrel')
+    }
+    // A few barrels hugging the enemy base for satisfying breaches.
+    const hq = this.buildings.find((b) => b.type === 'hq' && b.side === 'enemy')
+    if (hq) for (let i = 0; i < 3; i++) tryPlace(hq.x - 70, hq.y, 'barrel')
+
+    // Supply crates (loot) and sandbag nests (tough cover) around the mid-field.
+    for (let i = 0; i < 4 + Math.floor(idx / 2); i++) {
+      tryPlace(rng.range(WORLD_W * 0.3, WORLD_W * 0.85), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'crate')
+    }
+    for (let i = 0; i < 4 + Math.floor(idx / 2); i++) {
+      tryPlace(rng.range(WORLD_W * 0.3, WORLD_W * 0.88), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'sandbag')
+    }
+    // Dense foliage thickets (real tree art) for natural cover you move behind.
+    for (let i = 0; i < 10; i++) {
+      tryPlace(rng.range(WORLD_W * 0.2, WORLD_W * 0.92), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'bush')
+    }
   }
 
   private bulletBlocked(x: number, y: number): boolean {
@@ -369,6 +436,31 @@ export class Game {
         if (c.damage(dmg * (1 - d / (r + 10)))) this.onCivilianKilled(c, true)
       }
     }
+    // Props caught in the blast — barrels chain-react from here.
+    for (const p of this.props) {
+      if (p.alive && dist(x, y, p.x, p.y) < r + p.r) {
+        if (p.damage(dmg)) this.onPropDestroyed(p)
+      }
+    }
+  }
+
+  private onPropDestroyed(p: Prop) {
+    if (p.detonated) {
+      // Explosive barrel: detonation reaches into neighbouring props for chains.
+      this.explode(p.x, p.y, 64, 95)
+    } else if (p.kind === 'crate') {
+      this.fx.sparks(p.x, p.y, 9, '#caa05a')
+      this.fx.smoke(p.x, p.y, 2)
+      sfx.pickup()
+      if (Math.random() < 0.7) {
+        const roll = Math.random()
+        const type = roll < 0.5 ? 'cash' : roll < 0.78 ? 'medkit' : 'grenades'
+        this.pickups.push(new Pickup(p.x, p.y, type, 120))
+      }
+    } else {
+      this.fx.sparks(p.x, p.y, 7, '#b9a468')
+      this.fx.smoke(p.x, p.y, 1)
+    }
   }
 
   private onSoldierKilled(s: Soldier, explosive: boolean, shooter: Soldier | null) {
@@ -400,8 +492,18 @@ export class Game {
       if (roll < 0.2) this.pickups.push(new Pickup(s.x, s.y, 'cash', 50 + ((Math.random() * 4) | 0) * 50))
       else if (roll < 0.3) this.pickups.push(new Pickup(s.x, s.y, 'medkit'))
       else if (roll < 0.4) this.pickups.push(new Pickup(s.x, s.y, 'grenades'))
+      // Nameless enemy marker for the hill.
+      this.fallen.push(makeGrave('enemy', { age: enemyAge(), mission: this.mission.name }))
     } else {
-      this.casualties.push({ name: s.name, kills: s.kills, rank: s.rank(), mission: this.mission.name })
+      const grave = makeGrave('soldier', {
+        name: s.name,
+        kills: s.kills,
+        rank: s.rank(),
+        age: soldierAge(s.rank()),
+        mission: this.mission.name,
+      })
+      this.casualties.push(grave)
+      this.fallen.push(grave)
       this.fx.text(s.x, s.y - 20, `${s.name} IS DOWN!`, '#ff6666', 13)
     }
   }
@@ -457,6 +559,7 @@ export class Game {
 
   private onCivilianKilled(c: Civilian, explosive: boolean) {
     this.civKills++
+    this.fallen.push(makeGrave('civilian', { age: civilianAge(), mission: this.mission.name }))
     this.money = Math.max(0, this.money - 200)
     if (explosive) this.fx.gibs(c.x, c.y, 10)
     else this.fx.blood(c.x, c.y, rnd(0, Math.PI * 2), 10)
@@ -1021,6 +1124,15 @@ export class Game {
 
   private collideBullet(b: Bullet) {
     const hit = (): boolean => {
+      // Props are neutral cover: anyone's rounds chip them, and a stray shot
+      // into a barrel is its own reward.
+      for (const p of this.props) {
+        if (p.alive && dist(b.x, b.y, p.x, p.y) < p.r) {
+          this.fx.sparks(b.x, b.y, 3, p.kind === 'barrel' ? '#ffb347' : '#c9b89a')
+          if (p.damage(b.dmg)) this.onPropDestroyed(p)
+          return true
+        }
+      }
       if (b.side === 'player') {
         for (const sq of this.enemySquads) {
           for (const s of sq.alive()) {
@@ -1216,7 +1328,7 @@ export class Game {
   private commitGraves() {
     if (this.gravesCommitted) return
     this.gravesCommitted = true
-    if (this.casualties.length > 0) addGraves(this.casualties)
+    if (this.fallen.length > 0) addGraves(this.fallen)
   }
 
   // ------------------------------------------------------------------
@@ -1307,26 +1419,40 @@ export class Game {
       ctx.textAlign = 'left'
     }
 
+    // Pickups read as on the ground, below everything else.
     for (const p of this.pickups) p.render(ctx)
+
+    // Depth-sorted actor pass: buildings, props, vehicles, civilians and
+    // soldiers are drawn back-to-front by their foot position, so a unit north
+    // of a building or crate is correctly occluded *behind* it, and steps out
+    // *in front* as it moves south.
+    const items: { y: number; draw: () => void }[] = []
     for (const b of this.buildings) {
-      if (b.side === 'player' || this.fog.isExplored(b.x, b.y)) b.render(ctx, this.time)
+      if (b.side === 'player' || this.fog.isExplored(b.x, b.y)) {
+        items.push({ y: b.y + b.radius() * 0.45, draw: () => b.render(ctx, this.time) })
+      }
+    }
+    for (const p of this.props) {
+      if (p.alive && this.fog.isExplored(p.x, p.y)) items.push({ y: p.sortY(), draw: () => p.render(ctx) })
     }
     for (const c of this.civilians) {
-      if (this.fog.isVisible(c.x, c.y)) c.render(ctx)
+      if (this.fog.isVisible(c.x, c.y)) items.push({ y: c.y, draw: () => c.render(ctx) })
     }
-    for (const v of this.playerVehicles) v.render(ctx)
+    for (const v of this.playerVehicles) items.push({ y: v.y, draw: () => v.render(ctx) })
     for (const v of this.enemyVehicles) {
-      if (this.fog.isVisible(v.x, v.y)) v.render(ctx)
+      if (this.fog.isVisible(v.x, v.y)) items.push({ y: v.y, draw: () => v.render(ctx) })
     }
     if (!this.squad.mounted()) {
-      const units = this.squad.alive()
-      for (let i = units.length - 1; i >= 0; i--) units[i].render(ctx, i === 0)
+      this.squad.alive().forEach((s, i) => items.push({ y: s.y, draw: () => s.render(ctx, i === 0) }))
     }
     for (const sq of this.enemySquads) {
       for (const s of sq.alive()) {
-        if (this.fog.isVisible(s.x, s.y)) s.render(ctx)
+        if (this.fog.isVisible(s.x, s.y)) items.push({ y: s.y, draw: () => s.render(ctx) })
       }
     }
+    items.sort((a, b) => a.y - b.y)
+    for (const it of items) it.draw()
+
     // Tree canopies sit above units, so the squad reads as hidden underneath.
     this.terrain.renderCanopies(ctx)
     for (const m of this.missiles) m.render(ctx, this.time)
