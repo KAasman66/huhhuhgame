@@ -36,7 +36,7 @@ function drawTopBar(g: Game, ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = '#ffe14a'
   ctx.fillText(`$${g.money}`, 24, 68)
   ctx.fillStyle = '#aacc66'
-  ctx.fillText(`\u25CF GRENADES: ${g.squad.grenades}`, 110, 68)
+  ctx.fillText(`\u25CF MISSILES: ${g.squad.grenades}`, 110, 68)
 
   if (g.mission.waves) {
     ctx.fillStyle = '#ff9966'
@@ -216,7 +216,7 @@ function drawBuildMenu(g: Game, ctx: CanvasRenderingContext2D) {
 function drawHints(g: Game, ctx: CanvasRenderingContext2D) {
   ctx.font = `10px ${FONT}`
   ctx.fillStyle = 'rgba(200,220,180,0.55)'
-  const parts = ['LMB move', 'RMB fire', 'G grenade', 'S formation']
+  const parts = ['LMB move', 'RMB fire', 'G missile', 'S formation']
   if (g.mission.build || g.mission.vehicles) parts.push('E shop')
   if (g.squad.mounted()) parts.push('SPACE dismount')
   else if (g.playerVehicles.length > 0) parts.push('LMB on vehicle = board')

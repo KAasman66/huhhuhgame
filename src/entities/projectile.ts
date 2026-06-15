@@ -44,6 +44,104 @@ export class Bullet {
   }
 }
 
+export interface HomingTarget {
+  x: number
+  y: number
+  alive: boolean
+}
+
+/**
+ * Fire-and-forget seeking missile. Auto-homes onto a target (no aiming) and
+ * only ever detonates once it has travelled at least `minSafe` from its launch
+ * point, so it never blows up in the squad's face. If the target dies it flies
+ * on and detonates at the safe distance.
+ */
+export class Missile {
+  vx: number
+  vy: number
+  life = 4
+  alive = true
+  detonated = false // true = exploded; false-on-death = dud (no blast, kept squad safe)
+  private ox: number
+  private oy: number
+  private lastDist = Infinity
+
+  constructor(
+    public x: number,
+    public y: number,
+    angle: number,
+    public side: Side,
+    public target: HomingTarget | null,
+    public speed = 280,
+    public turn = 12, // rad/s — agile enough to spiral onto strafing targets
+    public minSafe = 95, // never detonate this close to the launch point
+  ) {
+    this.vx = Math.cos(angle) * speed
+    this.vy = Math.sin(angle) * speed
+    this.ox = x
+    this.oy = y
+  }
+
+  private boom() {
+    this.alive = false
+    this.detonated = true
+  }
+
+  update(dt: number) {
+    if (this.target && this.target.alive) {
+      const desired = Math.atan2(this.target.y - this.y, this.target.x - this.x)
+      const cur = Math.atan2(this.vy, this.vx)
+      let diff = desired - cur
+      while (diff > Math.PI) diff -= Math.PI * 2
+      while (diff < -Math.PI) diff += Math.PI * 2
+      const step = Math.max(-this.turn * dt, Math.min(this.turn * dt, diff))
+      const na = cur + step
+      this.vx = Math.cos(na) * this.speed
+      this.vy = Math.sin(na) * this.speed
+    }
+    this.x += this.vx * dt
+    this.y += this.vy * dt
+    this.life -= dt
+
+    // Safety: only ever detonate once we're clear of the launch point, so the
+    // blast can never reach the squad — even against a point-blank enemy.
+    const clear = Math.hypot(this.x - this.ox, this.y - this.oy) >= this.minSafe
+    if (clear && this.target && this.target.alive) {
+      const d = Math.hypot(this.target.x - this.x, this.target.y - this.y)
+      if (d < 26 || (d < 34 && d > this.lastDist)) this.boom()
+      this.lastDist = d
+    } else if (clear && !(this.target && this.target.alive)) {
+      this.boom() // target gone, already at safe distance
+    }
+    if (this.life <= 0) {
+      // Out of fuel: detonate if safely clear, otherwise fizzle as a dud.
+      if (clear) this.boom()
+      else this.alive = false
+    }
+  }
+
+  render(ctx: CanvasRenderingContext2D, t: number) {
+    const ang = Math.atan2(this.vy, this.vx)
+    // Flame trail
+    const flick = 6 + (Math.floor(t * 30) % 3) * 2
+    ctx.strokeStyle = 'rgba(255,170,40,0.8)'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(this.x - Math.cos(ang) * flick, this.y - Math.sin(ang) * flick)
+    ctx.lineTo(this.x, this.y)
+    ctx.stroke()
+    // Warhead
+    ctx.save()
+    ctx.translate(this.x, this.y)
+    ctx.rotate(ang)
+    ctx.fillStyle = this.side === 'player' ? '#dfe6ea' : '#e0a0a0'
+    ctx.fillRect(-4, -2, 8, 4)
+    ctx.fillStyle = '#c03030'
+    ctx.fillRect(3, -2, 2, 4)
+    ctx.restore()
+  }
+}
+
 export class Grenade {
   vx: number
   vy: number

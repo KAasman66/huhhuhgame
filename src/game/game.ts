@@ -7,7 +7,7 @@ import { Terrain } from '../world/terrain'
 import { Fog } from '../world/fog'
 import { findPath } from '../world/path'
 import { Soldier, aimSpread } from '../entities/soldier'
-import { Bullet, Grenade } from '../entities/projectile'
+import { Bullet, Missile, HomingTarget } from '../entities/projectile'
 import { Building, BUILDING_STATS, BuildingType } from '../entities/building'
 import { Vehicle, VEHICLE_STATS, VehicleType } from '../entities/vehicle'
 import { Civilian } from '../entities/civilian'
@@ -52,7 +52,7 @@ export class Game {
   buildings: Building[] = []
   civilians: Civilian[] = []
   bullets: Bullet[] = []
-  grenades: Grenade[] = []
+  missiles: Missile[] = []
   pickups: Pickup[] = []
   extraction: { x: number; y: number; r: number } | null = null
   minimapBase: HTMLCanvasElement | null = null
@@ -162,7 +162,7 @@ export class Game {
     this.buildings = []
     this.civilians = []
     this.bullets = []
-    this.grenades = []
+    this.missiles = []
     this.pickups = []
     this.money = def.cash
     this.killCount = 0
@@ -770,8 +770,13 @@ export class Game {
     if (input.pressed('g') && !this.squad.mounted()) {
       const l = this.squad.leader()
       if (l && this.squad.grenades > 0) {
+        // Seeking missile: auto-locks the nearest hostile, no aiming needed.
+        const target = this.nearestHostile(l.x, l.y, 1400)
+        const angle = target
+          ? angleTo(l.x, l.y, target.x, target.y)
+          : angleTo(l.x, l.y, mouseWX, mouseWY) // nothing in range → fly at the cursor
         this.squad.grenades--
-        this.grenades.push(new Grenade(l.x, l.y, mouseWX, mouseWY, 'player'))
+        this.missiles.push(new Missile(l.x, l.y, angle, 'player', target))
         sfx.grenadePin()
       } else {
         sfx.denied()
@@ -832,6 +837,23 @@ export class Game {
         best = v
       }
     }
+    return best
+  }
+
+  /** Nearest hostile (infantry, vehicle or enemy building) for missile lock. */
+  private nearestHostile(x: number, y: number, maxR: number): HomingTarget | null {
+    let best: HomingTarget | null = null
+    let bd = maxR
+    const consider = (t: HomingTarget) => {
+      const d = dist(x, y, t.x, t.y)
+      if (d < bd) {
+        bd = d
+        best = t
+      }
+    }
+    for (const sq of this.enemySquads) for (const s of sq.alive()) consider(s)
+    for (const v of this.enemyVehicles) if (v.alive) consider(v)
+    for (const b of this.buildings) if (b.alive && b.side === 'enemy') consider(b)
     return best
   }
 
@@ -973,11 +995,11 @@ export class Game {
   }
 
   private updateProjectiles(dt: number) {
-    for (const g of this.grenades) {
-      g.update(dt)
-      if (!g.alive) this.explode(g.x, g.y, 75, 95)
+    for (const m of this.missiles) {
+      m.update(dt)
+      if (!m.alive && m.detonated) this.explode(m.x, m.y, 80, 150)
     }
-    this.grenades = this.grenades.filter((g) => g.alive)
+    this.missiles = this.missiles.filter((m) => m.alive)
 
     for (const b of this.bullets) {
       if (!b.alive) continue
@@ -1307,7 +1329,7 @@ export class Game {
     }
     // Tree canopies sit above units, so the squad reads as hidden underneath.
     this.terrain.renderCanopies(ctx)
-    for (const g of this.grenades) g.render(ctx, this.time)
+    for (const m of this.missiles) m.render(ctx, this.time)
     for (const b of this.bullets) b.render(ctx)
     this.fx.render(ctx)
 

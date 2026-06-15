@@ -146,7 +146,7 @@ function drawTitle(g: Game, ctx: CanvasRenderingContext2D) {
 
   ctx.font = `11px ${FONT}`
   ctx.fillStyle = 'rgba(160,180,140,0.5)'
-  ctx.fillText('LMB move \u00B7 RMB shoot \u00B7 G grenade \u00B7 S formation \u00B7 E shop \u00B7 squad follows the leader', VIEW_W / 2, VIEW_H - 28)
+  ctx.fillText('LMB move \u00B7 RMB shoot \u00B7 G seeking missile \u00B7 S formation \u00B7 E shop \u00B7 squad follows the leader', VIEW_W / 2, VIEW_H - 28)
   ctx.textAlign = 'left'
 
   scanlines(ctx, t)
