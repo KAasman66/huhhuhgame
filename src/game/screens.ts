@@ -97,9 +97,7 @@ function drawTitle(g: Game, ctx: CanvasRenderingContext2D) {
   ctx.fillText('MEAT GRINDER', VIEW_W / 2, 195 + bounce)
   ctx.fillStyle = '#7a4040'
   ctx.font = `bold 16px ${FONT}`
-  ctx.fillText('THE DEAD COST NOTHING.', VIEW_W / 2, 228 + bounce)
-  ctx.font = `bold 15px ${FONT}`
-  ctx.fillText("THAT'S WHY THERE'S ALWAYS MORE.", VIEW_W / 2, 248 + bounce)
+  ctx.fillText('“EITHER WAR IS OBSOLETE OR MEN ARE.”', VIEW_W / 2, 236 + bounce)
 
   // Menu
   const blink = Math.floor(t * 2) % 2 === 0

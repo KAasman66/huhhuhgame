@@ -226,6 +226,9 @@ function makeCanvasFromRegion(img: HTMLImageElement, sx: number, sy: number, sw:
 
 export type BuildingSpriteKey = 'tower' | 'barracks' | 'factory' | 'hq' | 'etower' | 'spawner'
 
+export type TileSet = { grass: Sprite[]; dirt: Sprite[]; water: Sprite[]; forest: Sprite[] }
+export type Biome = 'green' | 'autumn' | 'desert' | 'snow' | 'urban'
+
 class ArtStore {
   ready = false
   title: Sprite | null = null
@@ -237,7 +240,15 @@ class ArtStore {
     tankEnemy: null,
   }
   buildings: Partial<Record<BuildingSpriteKey, Sprite>> = {}
-  tiles: { grass: Sprite[]; dirt: Sprite[]; water: Sprite[]; forest: Sprite[] } = { grass: [], dirt: [], water: [], forest: [] }
+  tiles: TileSet = { grass: [], dirt: [], water: [], forest: [] }
+  /** Per-biome tile palettes, built from tiles.png in parseTiles. */
+  biomes: Partial<Record<Biome, TileSet>> = {}
+
+  /** Point the active tile palette at a biome (terrain reads art.tiles). */
+  setBiome(b: Biome) {
+    const t = this.biomes[b] ?? this.biomes.green
+    if (t) this.tiles = t
+  }
   /** Top-down tree/bush PNGs (chabull, opengameart.org/content/trees-and-bushes, CC-BY 3.0). */
   trees: Sprite[] = []
   /** Boot Hill background banner (gravestones are drawn as labelled vectors). */
@@ -427,10 +438,39 @@ class ArtStore {
       c.getContext('2d')!.drawImage(img, cx * cw + inset, cy * ch + inset, cw - inset * 2, ch - inset * 2, 0, 0, 160, 160)
       return { c, w: 160, h: 160 }
     }
-    this.tiles.grass = [grab(0, 0), grab(1, 0), grab(2, 0), grab(0, 1), grab(1, 1)]
-    this.tiles.dirt = [grab(3, 0), grab(4, 0), grab(3, 1)]
-    this.tiles.water = [grab(4, 3), grab(5, 3)]
-    this.tiles.forest = [grab(0, 2), grab(1, 2), grab(2, 2)]
+    const water = [grab(4, 3), grab(5, 3)]
+    // Biome palettes from the 9x6 atlas (only water collides; ground is decor).
+    this.biomes.green = {
+      grass: [grab(0, 0), grab(1, 0), grab(2, 0), grab(0, 1), grab(1, 1)],
+      dirt: [grab(3, 0), grab(4, 0), grab(3, 1)],
+      water,
+      forest: [grab(0, 2), grab(1, 2), grab(2, 2)],
+    }
+    this.biomes.autumn = {
+      grass: [grab(0, 0), grab(1, 0), grab(2, 0)],
+      dirt: [grab(3, 1), grab(5, 2), grab(4, 0)],
+      water,
+      forest: [grab(3, 2), grab(4, 2)],
+    }
+    this.biomes.desert = {
+      grass: [grab(7, 0), grab(7, 1), grab(6, 0)],
+      dirt: [grab(3, 0), grab(4, 0)],
+      water,
+      forest: [grab(5, 2)],
+    }
+    this.biomes.snow = {
+      grass: [grab(8, 0), grab(8, 1)],
+      dirt: [grab(4, 1), grab(8, 2)],
+      water: [grab(7, 3), grab(8, 3)],
+      forest: [grab(8, 2)],
+    }
+    this.biomes.urban = {
+      grass: [grab(3, 4), grab(5, 1), grab(6, 1)],
+      dirt: [grab(4, 4), grab(7, 4)],
+      water,
+      forest: [grab(0, 2)],
+    }
+    this.tiles = this.biomes.green
   }
 
   /** 2×2 tiles embedded in sheet.png bottom-right. */

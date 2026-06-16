@@ -16,6 +16,7 @@ import { Prop, PropKind } from '../entities/prop'
 import { Squad } from './squad'
 import { EnemySquad, makeEnemySquad } from './ai'
 import { MISSIONS, ENDLESS, MissionDef, STAGE_KEYS } from './missions'
+import { art, Biome } from '../core/art'
 import { Roster, Grave, addGraves, loadProgress, saveProgress, makeGrave, soldierAge, civilianAge, enemyAge } from './roster'
 import { drawHUD, drawBuildGhost } from './hud'
 import { drawScreens } from './screens'
@@ -155,6 +156,14 @@ export class Game {
   loadMission(def: MissionDef) {
     this.mission = def
     const rng = new RNG(def.seed || 1)
+    // Per-mission biome so each level has a distinct look (terrain reads the
+    // active palette). Only water collides; ground/road tiles are decoration.
+    const BIOMES: Biome[] = [
+      'green', 'green', 'urban', 'autumn', 'urban', 'desert',
+      'green', 'autumn', 'snow', 'urban', 'snow', 'desert',
+    ]
+    const idx = MISSIONS.findIndex((m) => m.id === def.id)
+    art.setBiome(this.endlessMode || idx < 0 ? 'green' : BIOMES[idx % BIOMES.length])
     this.terrain = new Terrain(WORLD_W, WORLD_H, def.seed || 1)
     this.fog = new Fog(WORLD_W, WORLD_H)
     this.fx = new FX()
