@@ -227,7 +227,7 @@ function makeCanvasFromRegion(img: HTMLImageElement, sx: number, sy: number, sw:
 export type BuildingSpriteKey = 'tower' | 'barracks' | 'factory' | 'hq' | 'etower' | 'spawner'
 
 export type TileSet = { grass: Sprite[]; dirt: Sprite[]; water: Sprite[]; forest: Sprite[] }
-export type Biome = 'green' | 'autumn' | 'desert' | 'snow' | 'urban'
+export type Biome = 'green' | 'autumn' | 'meadow' | 'woodland' | 'snow'
 
 class ArtStore {
   ready = false
@@ -439,36 +439,43 @@ class ArtStore {
       return { c, w: 160, h: 160 }
     }
     const water = [grab(4, 3), grab(5, 3)]
-    // Biome palettes from the 9x6 atlas (only water collides; ground is decor).
+    const greenGrass = [grab(0, 0), grab(1, 0), grab(2, 0), grab(0, 1), grab(1, 1)]
+    const greenForest = [grab(0, 2), grab(1, 2), grab(2, 2)]
+    // Natural, grass-dominant palettes (the old green look + subtle variety).
+    // Only water collides; ground tiles are decoration. No cobble/asphalt.
     this.biomes.green = {
-      grass: [grab(0, 0), grab(1, 0), grab(2, 0), grab(0, 1), grab(1, 1)],
+      grass: greenGrass,
       dirt: [grab(3, 0), grab(4, 0), grab(3, 1)],
       water,
-      forest: [grab(0, 2), grab(1, 2), grab(2, 2)],
+      forest: greenForest,
     }
+    // Lush flowery meadow — greener still, more flower variants.
+    this.biomes.meadow = {
+      grass: [grab(0, 1), grab(1, 1), grab(0, 0), grab(1, 0), grab(2, 0)],
+      dirt: [grab(3, 0), grab(3, 1)],
+      water,
+      forest: greenForest,
+    }
+    // Green grass + autumn trees and a touch more bare earth.
     this.biomes.autumn = {
       grass: [grab(0, 0), grab(1, 0), grab(2, 0)],
-      dirt: [grab(3, 1), grab(5, 2), grab(4, 0)],
+      dirt: [grab(3, 1), grab(4, 0), grab(5, 2)],
       water,
       forest: [grab(3, 2), grab(4, 2)],
     }
-    this.biomes.desert = {
-      grass: [grab(7, 0), grab(7, 1), grab(6, 0)],
-      dirt: [grab(3, 0), grab(4, 0)],
+    // Dense forest with natural dirt tracks (no paving).
+    this.biomes.woodland = {
+      grass: [grab(0, 0), grab(1, 0), grab(2, 0), grab(0, 1)],
+      dirt: [grab(0, 4), grab(1, 4), grab(3, 0)],
       water,
-      forest: [grab(5, 2)],
+      forest: greenForest,
     }
+    // The one cold, distinctly-different biome.
     this.biomes.snow = {
       grass: [grab(8, 0), grab(8, 1)],
       dirt: [grab(4, 1), grab(8, 2)],
       water: [grab(7, 3), grab(8, 3)],
       forest: [grab(8, 2)],
-    }
-    this.biomes.urban = {
-      grass: [grab(3, 4), grab(5, 1), grab(6, 1)],
-      dirt: [grab(4, 4), grab(7, 4)],
-      water,
-      forest: [grab(0, 2)],
     }
     this.tiles = this.biomes.green
   }

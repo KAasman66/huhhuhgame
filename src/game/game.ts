@@ -159,8 +159,8 @@ export class Game {
     // Per-mission biome so each level has a distinct look (terrain reads the
     // active palette). Only water collides; ground/road tiles are decoration.
     const BIOMES: Biome[] = [
-      'green', 'green', 'urban', 'autumn', 'urban', 'desert',
-      'green', 'autumn', 'snow', 'urban', 'snow', 'desert',
+      'green', 'meadow', 'woodland', 'autumn', 'green', 'meadow',
+      'woodland', 'autumn', 'snow', 'green', 'woodland', 'autumn',
     ]
     const idx = MISSIONS.findIndex((m) => m.id === def.id)
     art.setBiome(this.endlessMode || idx < 0 ? 'green' : BIOMES[idx % BIOMES.length])
