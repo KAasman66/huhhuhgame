@@ -187,7 +187,7 @@ function drawBuildMenu(g: Game, ctx: CanvasRenderingContext2D) {
   const w = 252
   const h = 44 + items.length * 30
   const x0 = VIEW_W / 2 - w / 2
-  const y0 = VIEW_H - h - 12
+  const y0 = VIEW_H - h - 56 // sit above the on-screen action bar
   panel(ctx, x0, y0, w, h)
 
   ctx.font = `bold 13px ${FONT}`
@@ -195,7 +195,7 @@ function drawBuildMenu(g: Game, ctx: CanvasRenderingContext2D) {
   ctx.fillText('FIELD REQUISITIONS', x0 + 14, y0 + 22)
   ctx.font = `10px ${FONT}`
   ctx.fillStyle = '#9fb886'
-  ctx.fillText('[E] close  [ESC] cancel', x0 + 150, y0 + 22)
+  ctx.fillText('[E] close · click to buy', x0 + 150, y0 + 22)
 
   items.forEach((it, i) => {
     const y = y0 + 48 + i * 30
@@ -210,6 +210,8 @@ function drawBuildMenu(g: Game, ctx: CanvasRenderingContext2D) {
     ctx.font = `9px ${FONT}`
     ctx.fillStyle = '#7d8f6d'
     ctx.fillText(it.note, x0 + 46, y + 11)
+    // Clickable row
+    g.addZone(x0 + 6, y - 16, w - 12, 28, () => g.shopBuy(it.key))
   })
 }
 

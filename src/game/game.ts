@@ -38,6 +38,8 @@ export class Game {
   screen: Screen = 'title'
   private prevScreen: Screen | null = null
   musicEnabled = false // off by default; toggle with M
+  /** Clickable UI hit-zones, rebuilt every render and consumed in update. */
+  clickZones: { x: number; y: number; w: number; h: number; act: () => void }[] = []
   time = 0
 
   // Mission state
@@ -670,6 +672,21 @@ export class Game {
         this.input.clicks.splice(i, 1)
       }
     }
+    // Generic clickable UI zones (registered during the previous render):
+    // level-select, menu, build-shop items, on-screen S/E/G/P, etc. Consume
+    // the click so it can't also fire/move/advance underneath.
+    for (let i = this.input.clicks.length - 1; i >= 0; i--) {
+      const c = this.input.clicks[i]
+      if (c.button !== 0) continue
+      for (let z = this.clickZones.length - 1; z >= 0; z--) {
+        const b = this.clickZones[z]
+        if (c.x >= b.x && c.x <= b.x + b.w && c.y >= b.y && c.y <= b.y + b.h) {
+          b.act()
+          this.input.clicks.splice(i, 1)
+          break
+        }
+      }
+    }
 
     switch (this.screen) {
       case 'title':
@@ -687,10 +704,7 @@ export class Game {
         }
         break
       case 'playing':
-        if (this.input.pressed('p')) {
-          this.paused = !this.paused
-          sfx.click()
-        }
+        if (this.input.pressed('p')) this.togglePause()
         if (this.paused) break
         // Hitstop: freeze the battle for a few frames on heavy impacts.
         // Camera still settles so the freeze reads as deliberate, not a stall.
@@ -703,29 +717,11 @@ export class Game {
         }
         break
       case 'debrief':
-        if (this.input.pressed(' ')) {
-          sfx.click()
-          if (this.campaignWon || this.endlessMode) {
-            this.screen = 'title'
-          } else {
-            this.missionIdx++
-            this.loadMission(MISSIONS[this.missionIdx])
-            this.screen = 'briefing'
-            this.briefingChars = 0
-          }
-        }
+        if (this.input.pressed(' ')) this.advanceDebrief()
         break
       case 'gameover':
-        if (this.input.pressed('r') && !this.endlessMode) {
-          this.squad = new Squad()
-          this.roster = new Roster()
-          this.loadMission(MISSIONS[this.missionIdx])
-          this.screen = 'briefing'
-          this.briefingChars = 0
-        }
-        if (this.input.pressed('escape') || (this.endlessMode && this.input.pressed('r'))) {
-          this.screen = 'title'
-        }
+        if (this.input.pressed('r') && !this.endlessMode) this.gameOverAction(false)
+        if (this.input.pressed('escape') || (this.endlessMode && this.input.pressed('r'))) this.gameOverAction(true)
         break
       case 'boothill':
         if (this.input.pressed('escape') || this.input.pressed('b')) this.screen = 'title'
@@ -766,6 +762,91 @@ export class Game {
     this.musicEnabled = !this.musicEnabled
     this.applyMusic()
     sfx.click()
+  }
+
+  /** Register a clickable rectangle for this frame (used by screens/hud). */
+  addZone(x: number, y: number, w: number, h: number, act: () => void) {
+    this.clickZones.push({ x, y, w, h, act })
+  }
+
+  // --- Click/key-shared actions ---------------------------------------------
+
+  /** Jump straight to a campaign mission with a fresh squad (level select). */
+  selectStage(i: number) {
+    sfx.click()
+    this.squad = new Squad()
+    this.roster = new Roster()
+    this.startCampaign(i)
+  }
+
+  toggleFormation() {
+    this.squad.formation = this.squad.formation === 'column' ? 'spread' : 'column'
+    const p = this.squad.pos()
+    if (p) this.fx.text(p.x, p.y - 26, this.squad.formation.toUpperCase(), '#9fd6ff', 11)
+    sfx.click()
+  }
+
+  toggleShop() {
+    if (!(this.mission.build || this.mission.vehicles)) return
+    this.buildMenuOpen = !this.buildMenuOpen
+    this.buildMode = null
+    sfx.click()
+  }
+
+  togglePause() {
+    this.paused = !this.paused
+    sfx.click()
+  }
+
+  /** Fire the seeking missile (auto-targets nearest; falls back to a point). */
+  fireMissile(tx: number, ty: number) {
+    if (this.squad.mounted()) return
+    const l = this.squad.leader()
+    if (l && this.squad.grenades > 0) {
+      const target = this.nearestHostile(l.x, l.y, 1400)
+      const angle = target ? angleTo(l.x, l.y, target.x, target.y) : angleTo(l.x, l.y, tx, ty)
+      this.squad.grenades--
+      this.missiles.push(new Missile(l.x, l.y, angle, 'player', target))
+      sfx.grenadePin()
+    } else {
+      sfx.denied()
+    }
+  }
+
+  /** Buy/build from the shop by its menu key ('1'..'6'). */
+  shopBuy(key: string) {
+    if (key === '1' && this.mission.build) this.tryStartBuild('tower')
+    else if (key === '2' && this.mission.build) this.tryStartBuild('barracks')
+    else if (key === '3' && this.mission.build) this.tryStartBuild('factory')
+    else if (key === '4' && this.mission.build) this.buyRecruit()
+    else if (key === '5' && this.mission.vehicles) this.buyVehicle('jeep')
+    else if (key === '6' && this.mission.vehicles) this.buyVehicle('tank')
+  }
+
+  /** Advance from the debrief screen (next mission or back to title). */
+  advanceDebrief() {
+    sfx.click()
+    if (this.campaignWon || this.endlessMode) {
+      this.screen = 'title'
+    } else {
+      this.missionIdx++
+      this.loadMission(MISSIONS[this.missionIdx])
+      this.screen = 'briefing'
+      this.briefingChars = 0
+    }
+  }
+
+  /** Retry the current mission, or return to title after game over. */
+  gameOverAction(toTitle: boolean) {
+    if (toTitle || this.endlessMode) {
+      this.screen = 'title'
+      return
+    }
+    this.squad = new Squad()
+    this.roster = new Roster()
+    this.loadMission(MISSIONS[this.missionIdx])
+    this.screen = 'briefing'
+    this.briefingChars = 0
   }
 
   /** Screen-space hit circle for the music-note button (bottom-right). */
@@ -826,6 +907,52 @@ export class Game {
     ctx.restore()
   }
 
+  /** Draw a labelled pill button and register its click zone. */
+  private uiButton(ctx: CanvasRenderingContext2D, label: string, x: number, y: number, w: number, h: number, act: () => void, active = false) {
+    ctx.save()
+    ctx.fillStyle = active ? 'rgba(60,90,40,0.9)' : 'rgba(0,0,0,0.55)'
+    ctx.fillRect(x, y, w, h)
+    ctx.lineWidth = 2
+    ctx.strokeStyle = active ? '#bdf09a' : 'rgba(180,200,160,0.6)'
+    ctx.strokeRect(x, y, w, h)
+    ctx.fillStyle = active ? '#eaffcf' : '#cdd9b0'
+    ctx.font = "bold 13px 'Courier New', monospace"
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, x + w / 2, y + h / 2 + 1)
+    ctx.restore()
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    this.addZone(x, y, w, h, act)
+  }
+
+  /** On-screen tappable action buttons (S/E/G/P) along the bottom centre. */
+  private drawActionBar(ctx: CanvasRenderingContext2D) {
+    const btns: { label: string; act: () => void; active?: boolean }[] = []
+    btns.push({ label: this.squad.formation === 'spread' ? 'SPREAD' : 'COLUMN', act: () => this.toggleFormation() })
+    if (this.mission.build || this.mission.vehicles)
+      btns.push({ label: 'SHOP', act: () => this.toggleShop(), active: this.buildMenuOpen })
+    btns.push({
+      label: `MISSILE ${this.squad.grenades}`,
+      act: () => {
+        const p = this.squad.pos()
+        if (p) this.fireMissile(p.x + 200, p.y)
+      },
+    })
+    btns.push({ label: this.paused ? 'RESUME' : 'PAUSE', act: () => this.togglePause() })
+
+    const h = 30
+    const gap = 8
+    const w = 104
+    const total = btns.length * w + (btns.length - 1) * gap
+    let x = (VIEW_W - total) / 2
+    const y = VIEW_H - h - 14
+    for (const b of btns) {
+      this.uiButton(ctx, b.label, x, y, w, h, b.act, b.active)
+      x += w + gap
+    }
+  }
+
   private updateTitle() {
     sfx.unlock()
     if (this.input.pressed('enter')) {
@@ -844,15 +971,9 @@ export class Game {
       sfx.click()
       this.screen = 'boothill'
     }
-    // Level select: STAGE_KEYS[i] jumps straight to that mission with a
-    // fresh squad (startCampaign only auto-resets the squad for mission 0).
+    // Level select: STAGE_KEYS[i] jumps straight to that mission.
     for (let i = 0; i < MISSIONS.length && i < STAGE_KEYS.length; i++) {
-      if (this.input.pressed(STAGE_KEYS[i])) {
-        sfx.click()
-        this.squad = new Squad()
-        this.roster = new Roster()
-        this.startCampaign(i)
-      }
+      if (this.input.pressed(STAGE_KEYS[i])) this.selectStage(i)
     }
   }
 
@@ -927,44 +1048,16 @@ export class Game {
   private handleOrders(mouseWX: number, mouseWY: number) {
     const input = this.input
 
-    if (input.pressed('e') && (this.mission.build || this.mission.vehicles)) {
-      this.buildMenuOpen = !this.buildMenuOpen
-      this.buildMode = null
-      sfx.click()
-    }
+    if (input.pressed('e')) this.toggleShop()
     if (input.pressed('escape')) {
       this.buildMenuOpen = false
       this.buildMode = null
     }
     if (this.buildMenuOpen) {
-      if (input.pressed('1') && this.mission.build) this.tryStartBuild('tower')
-      if (input.pressed('2') && this.mission.build) this.tryStartBuild('barracks')
-      if (input.pressed('3') && this.mission.build) this.tryStartBuild('factory')
-      if (input.pressed('4') && this.mission.build) this.buyRecruit()
-      if (input.pressed('5') && this.mission.vehicles) this.buyVehicle('jeep')
-      if (input.pressed('6') && this.mission.vehicles) this.buyVehicle('tank')
+      for (const k of ['1', '2', '3', '4', '5', '6']) if (input.pressed(k)) this.shopBuy(k)
     }
-    if (input.pressed('s')) {
-      this.squad.formation = this.squad.formation === 'column' ? 'spread' : 'column'
-      const p = this.squad.pos()
-      if (p) this.fx.text(p.x, p.y - 26, this.squad.formation.toUpperCase(), '#9fd6ff', 11)
-      sfx.click()
-    }
-    if (input.pressed('g') && !this.squad.mounted()) {
-      const l = this.squad.leader()
-      if (l && this.squad.grenades > 0) {
-        // Seeking missile: auto-locks the nearest hostile, no aiming needed.
-        const target = this.nearestHostile(l.x, l.y, 1400)
-        const angle = target
-          ? angleTo(l.x, l.y, target.x, target.y)
-          : angleTo(l.x, l.y, mouseWX, mouseWY) // nothing in range → fly at the cursor
-        this.squad.grenades--
-        this.missiles.push(new Missile(l.x, l.y, angle, 'player', target))
-        sfx.grenadePin()
-      } else {
-        sfx.denied()
-      }
-    }
+    if (input.pressed('s')) this.toggleFormation()
+    if (input.pressed('g')) this.fireMissile(mouseWX, mouseWY)
     if (input.pressed(' ') && this.squad.mounted()) {
       const spots = this.squad.dismount()
       this.squad.alive().forEach((s, i) => {
@@ -1416,6 +1509,7 @@ export class Game {
   // ------------------------------------------------------------------
 
   render(ctx: CanvasRenderingContext2D) {
+    this.clickZones = [] // rebuilt each frame by screens/hud/this render
     ctx.fillStyle = '#000'
     ctx.fillRect(0, 0, VIEW_W, VIEW_H)
 
@@ -1425,6 +1519,7 @@ export class Game {
     if (this.screen === 'playing') {
       drawHUD(this, ctx)
       this.renderLowHpVignette(ctx)
+      this.drawActionBar(ctx)
     }
 
     // Full-screen damage/impact flash (screen space, above world, below menus)

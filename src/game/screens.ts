@@ -103,17 +103,22 @@ function drawTitle(g: Game, ctx: CanvasRenderingContext2D) {
   const blink = Math.floor(t * 2) % 2 === 0
   ctx.font = `bold 22px ${FONT}`
   ctx.fillStyle = blink ? '#ffe14a' : '#bba23a'
+  const menuZone = (yy: number, act: () => void) => g.addZone(VIEW_W / 2 - 220, yy - 22, 440, 30, act)
   ctx.fillText('[ENTER]  NEW CAMPAIGN', VIEW_W / 2, 380)
+  menuZone(380, () => g.selectStage(0))
   ctx.font = `17px ${FONT}`
   ctx.fillStyle = '#9fb886'
   let y = 420
   if (g.progress.unlocked > 0 && g.progress.unlocked < MISSIONS.length) {
     ctx.fillText(`[C]  CONTINUE \u2014 MISSION ${g.progress.unlocked + 1}: ${MISSIONS[g.progress.unlocked].name}`, VIEW_W / 2, y)
+    menuZone(y, () => g.selectStage(Math.min(g.progress.unlocked, MISSIONS.length - 1)))
     y += 32
   }
   ctx.fillText('[E]  ENDLESS CHAOS', VIEW_W / 2, y)
+  menuZone(y, () => g.startEndless())
   y += 32
   ctx.fillText('[B]  BOOT HILL \u2014 honour the dead', VIEW_W / 2, y)
+  menuZone(y, () => (g.screen = 'boothill'))
   y += 32
   ctx.fillText(`[M]  MUSIC: ${g.musicEnabled ? 'ON' : 'OFF'}`, VIEW_W / 2, y)
 
@@ -133,7 +138,9 @@ function drawTitle(g: Game, ctx: CanvasRenderingContext2D) {
     const col = Math.floor(i / rows)
     const row = i % rows
     const key = STAGE_KEYS[i] ?? '?'
-    ctx.fillText(`[${key}] ${i + 1}. ${MISSIONS[i].name}`, colX[col], y + row * 20)
+    const ry = y + row * 20
+    ctx.fillText(`[${key}] ${i + 1}. ${MISSIONS[i].name}`, colX[col], ry)
+    g.addZone(colX[col] - 4, ry - 14, 200, 19, () => g.selectStage(i))
   }
   ctx.textAlign = 'center'
   y += rows * 20
@@ -275,11 +282,13 @@ function drawDebrief(g: Game, ctx: CanvasRenderingContext2D) {
   }
 
   ctx.textAlign = 'center'
+  ctx.font = `bold 17px ${FONT}`
   if (Math.floor(g.time * 2) % 2 === 0) {
-    ctx.font = `bold 17px ${FONT}`
     ctx.fillStyle = '#d9e8c9'
-    ctx.fillText(g.campaignWon || g.endlessMode ? 'PRESS [SPACE] FOR TITLE' : 'PRESS [SPACE] FOR NEXT MISSION', VIEW_W / 2, 620)
+    ctx.fillText(g.campaignWon || g.endlessMode ? 'CLICK / [SPACE] FOR TITLE' : 'CLICK / [SPACE] FOR NEXT MISSION', VIEW_W / 2, 620)
   }
+  // Whole screen advances the debrief.
+  g.addZone(0, 0, VIEW_W, VIEW_H, () => g.advanceDebrief())
   ctx.textAlign = 'left'
 }
 
@@ -308,10 +317,28 @@ function drawGameOver(g: Game, ctx: CanvasRenderingContext2D) {
     ctx.fillText('NEW RECORD!', VIEW_W / 2, y)
   }
 
-  if (Math.floor(g.time * 2) % 2 === 0) {
+  // Clickable buttons (also [R]/[ESC]).
+  const by = 552
+  const drawBtn = (label: string, cx: number, act: () => void) => {
+    const bw = 150
+    const bh = 38
+    const bx = cx - bw / 2
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'
+    ctx.fillRect(bx, by, bw, bh)
+    ctx.lineWidth = 2
+    ctx.strokeStyle = '#d9e8c9'
+    ctx.strokeRect(bx, by, bw, bh)
+    ctx.fillStyle = '#eaffcf'
     ctx.font = `bold 16px ${FONT}`
-    ctx.fillStyle = '#d9e8c9'
-    ctx.fillText(g.endlessMode ? 'PRESS [R] FOR TITLE' : 'PRESS [R] TO RETRY \u00B7 [ESC] FOR TITLE', VIEW_W / 2, 560)
+    ctx.textAlign = 'center'
+    ctx.fillText(label, cx, by + 25)
+    g.addZone(bx, by, bw, bh, act)
+  }
+  if (g.endlessMode) {
+    drawBtn('TITLE [R]', VIEW_W / 2, () => g.gameOverAction(true))
+  } else {
+    drawBtn('RETRY [R]', VIEW_W / 2 - 90, () => g.gameOverAction(false))
+    drawBtn('TITLE [ESC]', VIEW_W / 2 + 90, () => g.gameOverAction(true))
   }
   ctx.textAlign = 'left'
 }
