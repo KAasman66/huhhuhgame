@@ -120,6 +120,64 @@ function largestInCell(ctx: CanvasRenderingContext2D, rx: number, ry: number, rw
   return best
 }
 
+/**
+ * Auto-detect sprite rows by connected components instead of a fixed grid.
+ * Each opaque blob becomes one sprite cropped to its true bounds, so wide
+ * sprites (tanks, HQ) are never sliced in half by an arbitrary cell border.
+ * Components are clustered into rows by vertical position, each row sorted L→R.
+ * Expects the background already keyed to transparency.
+ */
+function detectSpriteRows(ctx: CanvasRenderingContext2D, w: number, h: number): Sprite[][] {
+  const data = ctx.getImageData(0, 0, w, h).data
+  const seen = new Uint8Array(w * h)
+  const stack: number[] = []
+  const A = 40
+  const comps: Box[] = []
+  for (let s = 0; s < w * h; s++) {
+    if (seen[s] || data[s * 4 + 3] < A) continue
+    let x0 = w
+    let y0 = h
+    let x1 = 0
+    let y1 = 0
+    let count = 0
+    stack.push(s)
+    seen[s] = 1
+    while (stack.length) {
+      const p = stack.pop()!
+      const px = p % w
+      const py = (p / w) | 0
+      if (px < x0) x0 = px
+      if (px > x1) x1 = px
+      if (py < y0) y0 = py
+      if (py > y1) y1 = py
+      count++
+      if (px > 0 && !seen[p - 1] && data[(p - 1) * 4 + 3] >= A) (seen[p - 1] = 1), stack.push(p - 1)
+      if (px < w - 1 && !seen[p + 1] && data[(p + 1) * 4 + 3] >= A) (seen[p + 1] = 1), stack.push(p + 1)
+      if (py > 0 && !seen[p - w] && data[(p - w) * 4 + 3] >= A) (seen[p - w] = 1), stack.push(p - w)
+      if (py < h - 1 && !seen[p + w] && data[(p + w) * 4 + 3] >= A) (seen[p + w] = 1), stack.push(p + w)
+    }
+    // Keep real sprites; drop tiny specks (muzzle flashes, dust).
+    if (count > 500 && x1 - x0 >= 18 && y1 - y0 >= 22) comps.push({ x0, y0, x1, y1 })
+  }
+  if (comps.length === 0) return []
+
+  comps.sort((a, b) => a.y0 + a.y1 - (b.y0 + b.y1))
+  const rows: Box[][] = []
+  let cur: Box[] = []
+  let prevMid = (comps[0].y0 + comps[0].y1) / 2
+  for (const c of comps) {
+    const mid = (c.y0 + c.y1) / 2
+    if (cur.length && Math.abs(mid - prevMid) > (c.y1 - c.y0) * 0.7) {
+      rows.push(cur)
+      cur = []
+    }
+    cur.push(c)
+    prevMid = mid
+  }
+  if (cur.length) rows.push(cur)
+  return rows.map((r) => r.sort((a, b) => a.x0 - b.x0).map((b) => cropToSprite(ctx, b)))
+}
+
 /** Slice a region into a grid; one sprite per occupied cell. */
 function sliceGrid(
   ctx: CanvasRenderingContext2D,
@@ -292,9 +350,9 @@ class ArtStore {
     ctx.drawImage(img, rx, ry, rw, rh, 0, 0, rw, rh)
     keyOutBackground(ctx, rw, rh)
 
-    const rows = sliceGrid(ctx, 0, 0, rw, rh, 4, 4)
+    const rows = detectSpriteRows(ctx, rw, rh)
     if (rows.length < 4) {
-      console.warn('[art] sheet2 grid parse incomplete', rows.length)
+      console.warn('[art] sheet2 sprite-row detect incomplete', rows.length)
       return
     }
 
@@ -332,7 +390,7 @@ class ArtStore {
     ctx.drawImage(img, 0, titleH + 6, sw, sh, 0, 0, sw, sh)
     keyOutBackground(ctx, sw, sh)
 
-    const rows = sliceGrid(ctx, 0, 0, sw, sh, 4, 4)
+    const rows = detectSpriteRows(ctx, sw, sh)
     if (rows.length < 4) return
 
     this.soldierPoses.player = rows[0]
