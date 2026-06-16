@@ -650,9 +650,16 @@ export class Game {
   update(dt: number) {
     this.time += dt
     if (this.flashA > 0) this.flashA = Math.max(0, this.flashA - dt * 2.2)
-    if (this.input.pressed('m')) {
-      this.musicEnabled = !this.musicEnabled
-      this.applyMusic()
+    if (this.input.pressed('m')) this.toggleMusic()
+    // Clickable music-note button (consume the click so it can't also advance
+    // a briefing, fire, or issue a move order).
+    const mb = this.musicBtn()
+    for (let i = this.input.clicks.length - 1; i >= 0; i--) {
+      const c = this.input.clicks[i]
+      if (c.button === 0 && Math.hypot(c.x - mb.cx, c.y - mb.cy) <= mb.r + 5) {
+        this.toggleMusic()
+        this.input.clicks.splice(i, 1)
+      }
     }
 
     switch (this.screen) {
@@ -744,6 +751,70 @@ export class Game {
       music.stop()
       titleMusic.play()
     }
+  }
+
+  private toggleMusic() {
+    this.musicEnabled = !this.musicEnabled
+    this.applyMusic()
+    sfx.click()
+  }
+
+  /** Screen-space hit circle for the music-note button (bottom-right). */
+  musicBtn() {
+    return { cx: VIEW_W - 36, cy: VIEW_H - 36, r: 20 }
+  }
+
+  /** A music note that gets a red slash when music is off. Clickable. */
+  private drawMusicButton(ctx: CanvasRenderingContext2D) {
+    const { cx, cy, r } = this.musicBtn()
+    const on = this.musicEnabled
+    ctx.save()
+    // Button disc
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fill()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = on ? 'rgba(159,224,122,0.9)' : 'rgba(150,150,150,0.7)'
+    ctx.stroke()
+
+    // Music note (two note heads + beam)
+    const col = on ? '#bdf09a' : '#9a9a9a'
+    ctx.fillStyle = col
+    ctx.strokeStyle = col
+    ctx.lineWidth = 2.4
+    const hx = cx - 6
+    const hx2 = cx + 5
+    const topY = cy - 9
+    // stems
+    ctx.beginPath()
+    ctx.moveTo(hx + 4.5, cy + 4)
+    ctx.lineTo(hx + 4.5, topY)
+    ctx.moveTo(hx2 + 4.5, cy + 2)
+    ctx.lineTo(hx2 + 4.5, topY - 2)
+    ctx.stroke()
+    // beam
+    ctx.beginPath()
+    ctx.moveTo(hx + 4.5, topY)
+    ctx.lineTo(hx2 + 4.5, topY - 2)
+    ctx.lineWidth = 3
+    ctx.stroke()
+    // note heads
+    ctx.beginPath()
+    ctx.ellipse(hx, cy + 4, 3.6, 2.7, -0.4, 0, Math.PI * 2)
+    ctx.ellipse(hx2, cy + 2, 3.6, 2.7, -0.4, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Red slash when off
+    if (!on) {
+      ctx.strokeStyle = '#e8412f'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(cx - r * 0.72, cy + r * 0.72)
+      ctx.lineTo(cx + r * 0.72, cy - r * 0.72)
+      ctx.stroke()
+    }
+    ctx.restore()
   }
 
   private updateTitle() {
@@ -1371,6 +1442,7 @@ export class Game {
     }
 
     drawScreens(this, ctx)
+    this.drawMusicButton(ctx)
   }
 
   /** Pulsing red edge vignette when the squad is close to wiping. */
