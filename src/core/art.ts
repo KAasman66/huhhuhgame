@@ -313,8 +313,10 @@ class ArtStore {
     tankEnemy: null,
   }
   buildings: Partial<Record<BuildingSpriteKey, Sprite>> = {}
-  /** Civilian sprites (Gemini sheet); empty → procedural fallback. */
+  /** Civilian sprites (newass sheet); empty → procedural fallback. */
   civilians: Sprite[] = []
+  /** Ambient animal sprites (flee gunfire, no combat interaction). */
+  animals: { dog: Sprite | null; pig: Sprite | null } = { dog: null, pig: null }
   tiles: TileSet = { grass: [], dirt: [], water: [], forest: [] }
   /** Per-biome tile palettes, built from tiles.png in parseTiles. */
   biomes: Partial<Record<Biome, TileSet>> = {}
@@ -339,12 +341,12 @@ class ArtStore {
     // Prefix with the Vite base so assets resolve under a sub-path too
     // (GitHub Pages /huhhuhgame/) as well as at a domain root (Netlify).
     const B = import.meta.env.BASE_URL
-    const [sheet, sheet2, tilesImg, bootHillImg, geminiImg] = await Promise.all([
+    const [sheet, sheet2, tilesImg, bootHillImg, newAssImg] = await Promise.all([
       loadImage(`${B}art/sheet.png`),
       loadImage(`${B}art/sheet2.png`),
       loadImage(`${B}art/tiles.png`),
       loadImage(`${B}art/boothill.png`),
-      loadImage(`${B}art/gemini.png`),
+      loadImage(`${B}art/newass.png`),
     ])
 
     // The pack numbers its files with gaps: 01–30, 38–44, 46–55.
@@ -384,8 +386,8 @@ class ArtStore {
 
     if (bootHillImg) safe('boothill', () => this.parseBootHill(bootHillImg))
 
-    // Override factory/barracks with the nicer Gemini buildings + civilians.
-    if (geminiImg) safe('gemini', () => this.parseGemini(geminiImg))
+    // Override factory + civilians + ambient animals from the newass sheet.
+    if (newAssImg) safe('newass', () => this.parseNewAss(newAssImg))
 
     this.ready = true
     console.info('[art] loaded', this.summary())
@@ -399,6 +401,7 @@ class ArtStore {
       vehicles: Object.values(this.vehicles).filter(Boolean).length,
       buildings: Object.keys(this.buildings).length,
       civilians: this.civilians.length,
+      animals: Object.values(this.animals).filter(Boolean).length,
       tiles: this.tiles.grass.length + this.tiles.dirt.length,
       trees: this.trees.length,
       bootHill: !!this.bootHill,
@@ -417,12 +420,15 @@ class ArtStore {
   }
 
   /**
-   * Gemini sheet (checkerboard baked, no alpha): a war factory (top) and a
-   * row of civilians (bottom). Keyed out, then the largest top blob = factory
-   * and the bottom blobs (L→R) = civilians. Barracks is left as the sheet2
-   * sprite.
+   * newass sheet (grey checkerboard baked, no alpha): rows of civilian
+   * front/back pairs, a dog + pig pair (bottom-left), and a big WAR FACTORY
+   * (bottom-right). Keyed out, then components are classified:
+   *   - largest blob          → war factory
+   *   - bottom-row blobs       → dog + pig (front = leftmost of each pair)
+   *   - everything else        → civilians (front-facing = left of each pair)
+   * Barracks stays the sheet2 sprite per design.
    */
-  private parseGemini(img: HTMLImageElement) {
+  private parseNewAss(img: HTMLImageElement) {
     const W = img.width
     const H = img.height
     const c = document.createElement('canvas')
@@ -430,24 +436,38 @@ class ArtStore {
     c.height = H
     const ctx = c.getContext('2d', { willReadFrequently: true })!
     ctx.drawImage(img, 0, 0)
-    keyOutFlatGrey(ctx, W, H)
-    const comps = findComponents(ctx, W, H, 1200)
+    keyOutBackground(ctx, W, H) // white/light-grey checkerboard → alpha
+    let comps = findComponents(ctx, W, H, 2000)
     if (comps.length === 0) return
     const midY = (b: Box) => (b.y0 + b.y1) / 2
     const area = (b: Box) => (b.x1 - b.x0) * (b.y1 - b.y0)
 
-    // Factory only: largest blob in the top ~55%. (Barracks stays the sheet2
-    // sprite per design — we don't override it from the Gemini sheet.)
-    const top = comps.filter((b) => midY(b) < H * 0.52)
-    if (top.length) {
-      const fac = top.reduce((a, b) => (area(b) > area(a) ? b : a))
-      this.buildings.factory = cropToSprite(ctx, fac)
+    // 1) War factory = by far the largest blob.
+    const fac = comps.reduce((a, b) => (area(b) > area(a) ? b : a))
+    this.buildings.factory = cropToSprite(ctx, fac)
+    comps = comps.filter((b) => b !== fac)
+
+    // 2) Animals live in the bottom row band; each is a front/back pair, so the
+    //    leftmost of each adjacent pair is the front view we want.
+    const animalRow = comps.filter((b) => midY(b) > H * 0.74).sort((a, b) => a.x0 - b.x0)
+    if (animalRow.length >= 1) this.animals.dog = cropToSprite(ctx, animalRow[0])
+    if (animalRow.length >= 3) this.animals.pig = cropToSprite(ctx, animalRow[2])
+
+    // 3) Civilians = the human figures above the animal row, clustered into
+    //    rows; within each row the front view is every other blob (L→R).
+    const humans = comps.filter((b) => midY(b) <= H * 0.74).sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)
+    const rows: Box[][] = []
+    for (const b of humans) {
+      const row = rows.find((r) => Math.abs(midY(r[0]) - midY(b)) < 90)
+      if (row) row.push(b)
+      else rows.push([b])
     }
-    // Civilians: blobs in the bottom band, left to right.
-    this.civilians = comps
-      .filter((b) => midY(b) > H * 0.78 && b.y1 - b.y0 > 30)
-      .sort((a, b) => a.x0 - b.x0)
-      .map((b) => cropToSprite(ctx, b))
+    const fronts: Box[] = []
+    for (const row of rows) {
+      row.sort((a, b) => a.x0 - b.x0)
+      for (let i = 0; i < row.length; i += 2) fronts.push(row[i])
+    }
+    this.civilians = fronts.map((b) => cropToSprite(ctx, b))
   }
 
   private parseTitleFromSheet(img: HTMLImageElement) {

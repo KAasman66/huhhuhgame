@@ -11,6 +11,7 @@ import { Bullet, Missile, HomingTarget } from '../entities/projectile'
 import { Building, BUILDING_STATS, BuildingType } from '../entities/building'
 import { Vehicle, VEHICLE_STATS, VehicleType } from '../entities/vehicle'
 import { Civilian } from '../entities/civilian'
+import { Animal } from '../entities/animal'
 import { Pickup } from '../entities/pickup'
 import { Prop, PropKind } from '../entities/prop'
 import { Squad } from './squad'
@@ -64,6 +65,7 @@ export class Game {
   playerVehicles: Vehicle[] = []
   buildings: Building[] = []
   civilians: Civilian[] = []
+  animals: Animal[] = []
   props: Prop[] = []
   decals: Decal[] = []
   bullets: Bullet[] = []
@@ -186,6 +188,7 @@ export class Game {
     this.playerVehicles = []
     this.buildings = []
     this.civilians = []
+    this.animals = []
     this.props = []
     this.bullets = []
     this.missiles = []
@@ -266,6 +269,14 @@ export class Game {
     for (let i = 0; i < def.civilians; i++) {
       const p = this.findOpen(rng.range(WORLD_W * 0.25, WORLD_W * 0.75), rng.range(WORLD_H * 0.15, WORLD_H * 0.85))
       this.civilians.push(new Civilian(p.x, p.y))
+    }
+
+    // Ambient wildlife — a handful of dogs and pigs roaming the map. They flee
+    // gunfire but never fight or block; pure atmosphere.
+    const animalCount = 4 + rng.int(0, 3)
+    for (let i = 0; i < animalCount; i++) {
+      const p = this.findOpen(rng.range(WORLD_W * 0.2, WORLD_W * 0.85), rng.range(WORLD_H * 0.12, WORLD_H * 0.88))
+      this.animals.push(new Animal(p.x, p.y, rng.next() < 0.5 ? 'dog' : 'pig'))
     }
 
     this.placeProps(rng, spawn)
@@ -447,6 +458,13 @@ export class Game {
     }
   }
 
+  /** Spook nearby wildlife away from gunfire/explosions. */
+  private scareAnimals(x: number, y: number, r: number) {
+    for (const a of this.animals) {
+      if (a.alive && dist(x, y, a.x, a.y) < r) a.scare(x, y)
+    }
+  }
+
   private soldierFire(s: Soldier, tx: number, ty: number) {
     s.angle = angleTo(s.x, s.y, tx, ty)
     const a = aimSpread(s.angle, s.side === 'player' ? 0.055 : 0.12)
@@ -457,6 +475,7 @@ export class Game {
     if (s.side === 'player') sfx.shoot()
     else if (this.camera.sees(s.x, s.y)) sfx.mg()
     this.scareCivs(s.x, s.y, 120, 0.25)
+    this.scareAnimals(s.x, s.y, 260)
   }
 
   private vehicleFire(v: Vehicle, tx: number, ty: number) {
@@ -476,6 +495,7 @@ export class Game {
       sfx.mg()
     }
     this.scareCivs(v.x, v.y, 160, 0.3)
+    this.scareAnimals(v.x, v.y, 320)
   }
 
   /** Brief freeze-frame to add impact to big hits. Caps so it never stacks too long. */
@@ -500,6 +520,7 @@ export class Game {
     }
     sfx.explosion(r > 60)
     this.scareCivs(x, y, r * 4, 0.8)
+    this.scareAnimals(x, y, r * 5)
 
     const hitSoldier = (s: Soldier, enemy: EnemySquad | null) => {
       const d = dist(x, y, s.x, s.y)
@@ -1530,6 +1551,8 @@ export class Game {
         sfx.cash()
       }
     }
+
+    for (const a of this.animals) a.update(dt, this.blockTest)
   }
 
   private checkWinLose(dt: number) {
@@ -1704,6 +1727,9 @@ export class Game {
     }
     for (const c of this.civilians) {
       if (this.fog.isVisible(c.x, c.y)) items.push({ y: c.y, draw: () => c.render(ctx) })
+    }
+    for (const a of this.animals) {
+      if (this.fog.isVisible(a.x, a.y)) items.push({ y: a.sortY(), draw: () => a.render(ctx) })
     }
     for (const v of this.playerVehicles) items.push({ y: v.y, draw: () => v.render(ctx) })
     for (const v of this.enemyVehicles) {
