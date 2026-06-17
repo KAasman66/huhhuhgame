@@ -25,6 +25,44 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   })
 }
 
+/**
+ * Border flood-fill keyer for a flat neutral-grey checkerboard (the Gemini
+ * sheets use ~120 and ~180 perfectly-grey squares, not near-white). Removes
+ * connected pixels that are near-neutral and in the grey band; textured sprite
+ * pixels (slightly coloured / outside the band) survive.
+ */
+function keyOutFlatGrey(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const img = ctx.getImageData(0, 0, w, h)
+  const d = img.data
+  const isBg = (p: number) => {
+    const r = d[p * 4]
+    const g = d[p * 4 + 1]
+    const b = d[p * 4 + 2]
+    const mx = Math.max(r, g, b)
+    const mn = Math.min(r, g, b)
+    return mx - mn <= 12 && mx >= 95 && mx <= 205
+  }
+  const seen = new Uint8Array(w * h)
+  const stack: number[] = []
+  for (let x = 0; x < w; x++) {
+    for (const p of [x, (h - 1) * w + x]) if (!seen[p] && isBg(p)) (seen[p] = 1), stack.push(p)
+  }
+  for (let y = 0; y < h; y++) {
+    for (const p of [y * w, y * w + w - 1]) if (!seen[p] && isBg(p)) (seen[p] = 1), stack.push(p)
+  }
+  while (stack.length) {
+    const p = stack.pop()!
+    d[p * 4 + 3] = 0
+    const px = p % w
+    const py = (p / w) | 0
+    if (px > 0 && !seen[p - 1] && isBg(p - 1)) (seen[p - 1] = 1), stack.push(p - 1)
+    if (px < w - 1 && !seen[p + 1] && isBg(p + 1)) (seen[p + 1] = 1), stack.push(p + 1)
+    if (py > 0 && !seen[p - w] && isBg(p - w)) (seen[p - w] = 1), stack.push(p - w)
+    if (py < h - 1 && !seen[p + w] && isBg(p + w)) (seen[p + w] = 1), stack.push(p + w)
+  }
+  ctx.putImageData(img, 0, 0)
+}
+
 /** Fake checkerboard → real alpha via border flood-fill. */
 function keyOutBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const img = ctx.getImageData(0, 0, w, h)
@@ -118,6 +156,41 @@ function largestInCell(ctx: CanvasRenderingContext2D, rx: number, ry: number, rw
     }
   }
   return best
+}
+
+/** All opaque connected components (background already keyed transparent). */
+function findComponents(ctx: CanvasRenderingContext2D, w: number, h: number, minArea = 1000): Box[] {
+  const data = ctx.getImageData(0, 0, w, h).data
+  const seen = new Uint8Array(w * h)
+  const stack: number[] = []
+  const A = 40
+  const comps: Box[] = []
+  for (let s = 0; s < w * h; s++) {
+    if (seen[s] || data[s * 4 + 3] < A) continue
+    let x0 = w
+    let y0 = h
+    let x1 = 0
+    let y1 = 0
+    let count = 0
+    stack.push(s)
+    seen[s] = 1
+    while (stack.length) {
+      const p = stack.pop()!
+      const px = p % w
+      const py = (p / w) | 0
+      if (px < x0) x0 = px
+      if (px > x1) x1 = px
+      if (py < y0) y0 = py
+      if (py > y1) y1 = y1 > py ? y1 : py
+      count++
+      if (px > 0 && !seen[p - 1] && data[(p - 1) * 4 + 3] >= A) (seen[p - 1] = 1), stack.push(p - 1)
+      if (px < w - 1 && !seen[p + 1] && data[(p + 1) * 4 + 3] >= A) (seen[p + 1] = 1), stack.push(p + 1)
+      if (py > 0 && !seen[p - w] && data[(p - w) * 4 + 3] >= A) (seen[p - w] = 1), stack.push(p - w)
+      if (py < h - 1 && !seen[p + w] && data[(p + w) * 4 + 3] >= A) (seen[p + w] = 1), stack.push(p + w)
+    }
+    if (count >= minArea) comps.push({ x0, y0, x1, y1 })
+  }
+  return comps
 }
 
 /**
@@ -240,6 +313,8 @@ class ArtStore {
     tankEnemy: null,
   }
   buildings: Partial<Record<BuildingSpriteKey, Sprite>> = {}
+  /** Civilian sprites (Gemini sheet); empty → procedural fallback. */
+  civilians: Sprite[] = []
   tiles: TileSet = { grass: [], dirt: [], water: [], forest: [] }
   /** Per-biome tile palettes, built from tiles.png in parseTiles. */
   biomes: Partial<Record<Biome, TileSet>> = {}
@@ -264,11 +339,12 @@ class ArtStore {
     // Prefix with the Vite base so assets resolve under a sub-path too
     // (GitHub Pages /huhhuhgame/) as well as at a domain root (Netlify).
     const B = import.meta.env.BASE_URL
-    const [sheet, sheet2, tilesImg, bootHillImg] = await Promise.all([
+    const [sheet, sheet2, tilesImg, bootHillImg, geminiImg] = await Promise.all([
       loadImage(`${B}art/sheet.png`),
       loadImage(`${B}art/sheet2.png`),
       loadImage(`${B}art/tiles.png`),
       loadImage(`${B}art/boothill.png`),
+      loadImage(`${B}art/gemini.png`),
     ])
 
     // The pack numbers its files with gaps: 01–30, 38–44, 46–55.
@@ -308,6 +384,9 @@ class ArtStore {
 
     if (bootHillImg) safe('boothill', () => this.parseBootHill(bootHillImg))
 
+    // Override factory/barracks with the nicer Gemini buildings + civilians.
+    if (geminiImg) safe('gemini', () => this.parseGemini(geminiImg))
+
     this.ready = true
     console.info('[art] loaded', this.summary())
   }
@@ -319,6 +398,7 @@ class ArtStore {
       enemyPoses: this.soldierPoses.enemy.length,
       vehicles: Object.values(this.vehicles).filter(Boolean).length,
       buildings: Object.keys(this.buildings).length,
+      civilians: this.civilians.length,
       tiles: this.tiles.grass.length + this.tiles.dirt.length,
       trees: this.trees.length,
       bootHill: !!this.bootHill,
@@ -334,6 +414,40 @@ class ArtStore {
    */
   private parseBootHill(img: HTMLImageElement) {
     this.bootHill = makeCanvasFromRegion(img, 0, 0, img.width, Math.round(img.height * 0.345))
+  }
+
+  /**
+   * Gemini sheet (checkerboard baked, no alpha): a war factory (top) and a
+   * row of civilians (bottom). Keyed out, then the largest top blob = factory
+   * and the bottom blobs (L→R) = civilians. Barracks is left as the sheet2
+   * sprite.
+   */
+  private parseGemini(img: HTMLImageElement) {
+    const W = img.width
+    const H = img.height
+    const c = document.createElement('canvas')
+    c.width = W
+    c.height = H
+    const ctx = c.getContext('2d', { willReadFrequently: true })!
+    ctx.drawImage(img, 0, 0)
+    keyOutFlatGrey(ctx, W, H)
+    const comps = findComponents(ctx, W, H, 1200)
+    if (comps.length === 0) return
+    const midY = (b: Box) => (b.y0 + b.y1) / 2
+    const area = (b: Box) => (b.x1 - b.x0) * (b.y1 - b.y0)
+
+    // Factory only: largest blob in the top ~55%. (Barracks stays the sheet2
+    // sprite per design — we don't override it from the Gemini sheet.)
+    const top = comps.filter((b) => midY(b) < H * 0.52)
+    if (top.length) {
+      const fac = top.reduce((a, b) => (area(b) > area(a) ? b : a))
+      this.buildings.factory = cropToSprite(ctx, fac)
+    }
+    // Civilians: blobs in the bottom band, left to right.
+    this.civilians = comps
+      .filter((b) => midY(b) > H * 0.78 && b.y1 - b.y0 > 30)
+      .sort((a, b) => a.x0 - b.x0)
+      .map((b) => cropToSprite(ctx, b))
   }
 
   private parseTitleFromSheet(img: HTMLImageElement) {

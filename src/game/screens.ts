@@ -512,22 +512,27 @@ function drawPicto(
   drawBody(color, 1)
 }
 
-/** Horizontal family sticker under each marker — holding-hands chain like picto.png. */
-function drawFamilyPictos(ctx: CanvasRenderingContext2D, cx: number, baseY: number, grave: Grave, scale: number) {
+/**
+ * Horizontal family sticker — the people left behind, holding hands.
+ * `topY` is where the block starts; figures stand on a baseline below it.
+ * Drawn bigger and clearer than before with a min size so it always reads.
+ */
+function drawFamilyPictos(ctx: CanvasRenderingContext2D, cx: number, topY: number, grave: Grave, scale: number) {
   const members = familyForGrave(grave)
-  const pictoScale = scale * 1.55
-  const iconW = 11.5 * scale
-  const gap = 2 * scale
+  const pictoScale = Math.max(1.7, scale * 2.1) // floor keeps them legible when stones are small
+  const figH = 15 * pictoScale
+  const footY = topY + figH
+  const iconW = 7.5 * pictoScale
+  const gap = 1.8 * pictoScale
   const totalW = members.length * iconW + Math.max(0, members.length - 1) * gap
   let x = cx - totalW / 2 + iconW / 2
-  const footY = baseY + (grave.type === 'soldier' ? 38 : 34) * scale
   const color =
-    grave.type === 'soldier' ? '#f4f0e6' : grave.type === 'civilian' ? '#dcccb0' : '#c8b494'
+    grave.type === 'soldier' ? '#f6f2e8' : grave.type === 'civilian' ? '#e2d2b6' : '#cdb998'
 
-  // Dark plate so silhouettes pop on the hill grass.
-  ctx.fillStyle = 'rgba(8,10,6,0.55)'
+  // Dark plate so the silhouettes pop on the hill grass.
+  ctx.fillStyle = 'rgba(8,10,6,0.6)'
   ctx.beginPath()
-  ctx.roundRect(cx - totalW / 2 - 4 * scale, footY - 14 * pictoScale, totalW + 8 * scale, 14 * pictoScale + 3 * scale, 3 * scale)
+  ctx.roundRect(cx - totalW / 2 - 5, footY - figH, totalW + 10, figH + 4, 4)
   ctx.fill()
 
   members.forEach((kind, i) => {
@@ -536,15 +541,56 @@ function drawFamilyPictos(ctx: CanvasRenderingContext2D, cx: number, baseY: numb
       const nx = x + iconW / 2 + gap / 2
       const handY = footY - 7.5 * pictoScale
       ctx.fillStyle = color
-      ctx.fillRect(
-        Math.round(nx),
-        Math.round(handY),
-        Math.max(2, Math.round(gap + 2.5 * scale)),
-        Math.max(2, Math.round(1.2 * scale)),
-      )
+      ctx.fillRect(Math.round(nx), Math.round(handY), Math.max(2, Math.round(gap + 1)), Math.max(2, Math.round(1.6)))
     }
     x += iconW + gap
   })
+}
+
+/**
+ * Readable nameplate drawn beneath a gravestone: a dark plaque with a bold
+ * title (rank + name, or ENEMY/CIVILIAN) and a subtitle (age, kills). Sizes
+ * have a floor so they're legible even on small hill stones. Returns bottom Y.
+ */
+function nameplate(ctx: CanvasRenderingContext2D, cx: number, topY: number, title: string, sub: string, scale: number): number {
+  const tSize = Math.max(11, 10.5 * scale)
+  const sSize = Math.max(9, 8.5 * scale)
+  const maxW = 150
+  ctx.textAlign = 'center'
+  // Fit the title within maxW (shrink then ellipsize).
+  let label = title
+  let ts = tSize
+  ctx.font = `bold ${ts}px ${FONT}`
+  while (ts > 8 && ctx.measureText(label).width > maxW) {
+    ts -= 0.5
+    ctx.font = `bold ${ts}px ${FONT}`
+  }
+  if (ctx.measureText(label).width > maxW) {
+    while (label.length > 2 && ctx.measureText(`${label}…`).width > maxW) label = label.slice(0, -1)
+    label += '…'
+  }
+  ctx.font = `bold ${ts}px ${FONT}`
+  let w = ctx.measureText(label).width
+  ctx.font = `${sSize}px ${FONT}`
+  w = Math.max(w, ctx.measureText(sub).width)
+  const padX = 8
+  const padY = 4
+  const boxW = w + padX * 2
+  const boxH = ts + sSize + padY * 2 + 3
+  ctx.fillStyle = 'rgba(8,10,6,0.74)'
+  ctx.beginPath()
+  ctx.roundRect(cx - boxW / 2, topY, boxW, boxH, 4)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(190,178,148,0.3)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+  ctx.font = `bold ${ts}px ${FONT}`
+  ctx.fillStyle = '#f3efe4'
+  ctx.fillText(label, cx, topY + padY + ts - 1)
+  ctx.font = `${sSize}px ${FONT}`
+  ctx.fillStyle = '#c6b893'
+  ctx.fillText(sub, cx, topY + padY + ts + sSize + 1)
+  return topY + boxH
 }
 
 /** Engrave centered text, shrinking or truncating so it fits the stone face. */
@@ -601,19 +647,22 @@ function drawGravestone(ctx: CanvasRenderingContext2D, x: number, baseY: number,
   ctx.ellipse(x, baseY + 2 * scale, 26 * scale, 7 * scale, 0, 0, Math.PI * 2)
   ctx.fill()
 
+  let plateBottom: number
   if (soldier) {
     drawMarbleStone(ctx, x, baseY, grave.style, scale)
+    // A simple R.I.P. carved on the stone; the readable info goes on the plate.
     const top = baseY - 66 * scale
-    carve(ctx, `${rankName(grave.rank)}`, x, top + 18 * scale, 9 * scale, '#6b6b62')
-    carveFit(ctx, `${grave.name ?? '???'}`, x, top + 31 * scale, faceW, 12 * scale, 7 * scale, '#3a3a34')
-    carve(ctx, `AGE ${grave.age}`, x, top + 44 * scale, 8 * scale, '#6b6b62')
-    if (grave.kills > 0) carve(ctx, `${grave.kills} kills`, x, baseY + 9 * scale, 8 * scale, '#9aa886')
+    carve(ctx, 'R.I.P.', x, top + 22 * scale, 9 * scale, '#6b6b62')
+    void faceW
+    const sub = grave.kills > 0 ? `age ${grave.age}  ·  ${grave.kills} kills` : `age ${grave.age}`
+    plateBottom = nameplate(ctx, x, baseY + 7 * scale, `${rankName(grave.rank)} ${grave.name ?? '???'}`, sub, scale)
   } else {
     drawSimpleMarker(ctx, x, baseY, grave, scale, mulberry32(grave.seed || 1))
-    carve(ctx, `AGE ${grave.age}`, x, baseY + 14 * scale, 8 * scale, '#b8ab8c')
+    const label = grave.type === 'enemy' ? 'ENEMY' : 'CIVILIAN'
+    plateBottom = nameplate(ctx, x, baseY + 9 * scale, label, `age ${grave.age}`, scale)
   }
 
-  drawFamilyPictos(ctx, x, baseY, grave, scale)
+  drawFamilyPictos(ctx, x, plateBottom + 3 * scale, grave, scale)
 }
 
 /** Eight pale-marble soldier headstone silhouettes. */

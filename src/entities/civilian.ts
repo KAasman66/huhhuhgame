@@ -1,5 +1,6 @@
 import { angleTo, dist, rnd, rndPick } from '../core/math'
 import type { BlockTest } from './soldier'
+import { art } from '../core/art'
 
 const SHIRTS = ['#c9a227', '#3f7fbf', '#b03a78', '#7f5fb0', '#3fa66a', '#c96b27']
 
@@ -15,6 +16,7 @@ export class Civilian {
   panic = 0
   shirt = rndPick(SHIRTS)
   angle = rnd(0, Math.PI * 2)
+  spriteIdx = (Math.random() * 1000) | 0
   walkPhase = 0
   moving = false
   private wanderCd = rnd(1, 3)
@@ -114,24 +116,34 @@ export class Civilian {
     ctx.ellipse(x, y + 5, 6, 2.5, 0, 0, Math.PI * 2)
     ctx.fill()
 
-    ctx.save()
-    ctx.translate(x, y)
-    ctx.rotate(this.angle + Math.PI / 2)
-    const leg = this.moving ? Math.sin(this.walkPhase) * 3 : 0
-    ctx.fillStyle = '#33415c'
-    ctx.fillRect(-3.5, 2 - leg, 3, 4.5)
-    ctx.fillRect(0.5, 2 + leg, 3, 4.5)
-    ctx.fillStyle = this.shirt
-    ctx.fillRect(-4.5, -4, 9, 8)
-    ctx.fillStyle = '#d8b894'
-    ctx.beginPath()
-    ctx.arc(0, -3.5, 3.2, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.fillStyle = '#4a3318'
-    ctx.beginPath()
-    ctx.arc(0, -4, 3.2, Math.PI, Math.PI * 2)
-    ctx.fill()
-    ctx.restore()
+    const civs = art.civilians
+    if (civs.length > 0) {
+      // Upright Gemini figure: feet at (x,y), small bob while walking.
+      const sp = civs[this.spriteIdx % civs.length]
+      const h = 26
+      const w = (h * sp.w) / sp.h
+      const bob = this.moving ? Math.abs(Math.sin(this.walkPhase)) * 1.5 : 0
+      ctx.drawImage(sp.c, x - w / 2, y - h + 4 - bob, w, h)
+    } else {
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.rotate(this.angle + Math.PI / 2)
+      const leg = this.moving ? Math.sin(this.walkPhase) * 3 : 0
+      ctx.fillStyle = '#33415c'
+      ctx.fillRect(-3.5, 2 - leg, 3, 4.5)
+      ctx.fillRect(0.5, 2 + leg, 3, 4.5)
+      ctx.fillStyle = this.shirt
+      ctx.fillRect(-4.5, -4, 9, 8)
+      ctx.fillStyle = '#d8b894'
+      ctx.beginPath()
+      ctx.arc(0, -3.5, 3.2, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#4a3318'
+      ctx.beginPath()
+      ctx.arc(0, -4, 3.2, Math.PI, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
 
     // Follow indicator
     if (this.following) {
