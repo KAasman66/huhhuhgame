@@ -317,6 +317,8 @@ class ArtStore {
   civilians: Sprite[] = []
   /** Ambient animal sprites (flee gunfire, no combat interaction). */
   animals: { dog: Sprite | null; pig: Sprite | null } = { dog: null, pig: null }
+  /** Decorative scatter props sliced from more.png (wrecks, ruins, junk, nature). */
+  scatter: Sprite[] = []
   tiles: TileSet = { grass: [], dirt: [], water: [], forest: [] }
   /** Per-biome tile palettes, built from tiles.png in parseTiles. */
   biomes: Partial<Record<Biome, TileSet>> = {}
@@ -341,12 +343,13 @@ class ArtStore {
     // Prefix with the Vite base so assets resolve under a sub-path too
     // (GitHub Pages /huhhuhgame/) as well as at a domain root (Netlify).
     const B = import.meta.env.BASE_URL
-    const [sheet, sheet2, tilesImg, bootHillImg, newAssImg] = await Promise.all([
+    const [sheet, sheet2, tilesImg, bootHillImg, newAssImg, moreImg] = await Promise.all([
       loadImage(`${B}art/sheet.png`),
       loadImage(`${B}art/sheet2.png`),
       loadImage(`${B}art/tiles.png`),
       loadImage(`${B}art/boothill.png`),
       loadImage(`${B}art/newass.png`),
+      loadImage(`${B}art/more.png`),
     ])
 
     // The pack numbers its files with gaps: 01–30, 38–44, 46–55.
@@ -389,6 +392,9 @@ class ArtStore {
     // Override factory + civilians + ambient animals from the newass sheet.
     if (newAssImg) safe('newass', () => this.parseNewAss(newAssImg))
 
+    // Scatter props (wrecked cars, ruins, junk, fences, nature) from more.png.
+    if (moreImg) safe('more', () => this.parseMore(moreImg))
+
     this.ready = true
     console.info('[art] loaded', this.summary())
   }
@@ -402,6 +408,7 @@ class ArtStore {
       buildings: Object.keys(this.buildings).length,
       civilians: this.civilians.length,
       animals: Object.values(this.animals).filter(Boolean).length,
+      scatter: this.scatter.length,
       tiles: this.tiles.grass.length + this.tiles.dirt.length,
       trees: this.trees.length,
       bootHill: !!this.bootHill,
@@ -468,6 +475,29 @@ class ArtStore {
       for (let i = 0; i < row.length; i += 2) fronts.push(row[i])
     }
     this.civilians = fronts.map((b) => cropToSprite(ctx, b))
+  }
+
+  /**
+   * more.png: a big prop pack (wrecked cars, ruined buildings, barrels, crates,
+   * barriers, fences, playground gear, dead trees, rocks, debris) on a white
+   * checkerboard. Each connected blob becomes one scatter sprite the game
+   * sprinkles across the stages for cover and atmosphere — sorted in reading
+   * order so picks are deterministic. No semantics: the game scales each by its
+   * own footprint and derives collision from that.
+   */
+  private parseMore(img: HTMLImageElement) {
+    const W = img.width
+    const H = img.height
+    const c = document.createElement('canvas')
+    c.width = W
+    c.height = H
+    const ctx = c.getContext('2d', { willReadFrequently: true })!
+    ctx.drawImage(img, 0, 0)
+    keyOutBackground(ctx, W, H)
+    const comps = findComponents(ctx, W, H, 400)
+    // Reading order (row-major) so the same seed always picks the same props.
+    comps.sort((a, b) => (Math.abs(a.y0 - b.y0) < 40 ? a.x0 - b.x0 : a.y0 - b.y0))
+    this.scatter = comps.map((b) => cropToSprite(ctx, b))
   }
 
   private parseTitleFromSheet(img: HTMLImageElement) {

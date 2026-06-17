@@ -364,17 +364,35 @@ export class Game {
     for (let i = 0; i < 14; i++) {
       tryPlace(rng.range(WORLD_W * 0.2, WORLD_W * 0.92), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'bush')
     }
-    // Boulder fields — solid cover that bullets stop on, scattered in clusters.
-    const rockFields = 3 + Math.floor(idx / 3)
-    for (let f = 0; f < rockFields; f++) {
-      const cx = rng.range(WORLD_W * 0.25, WORLD_W * 0.9)
-      const cy = rng.range(WORLD_H * 0.1, WORLD_H * 0.9)
-      const n = rng.int(2, 5)
-      for (let i = 0; i < n; i++) tryPlace(cx, cy, 'rock')
+
+    // Scatter pack (more.png): wrecked cars, ruins, barriers, fences, dead
+    // trees, rocks, debris — real solid cover that makes every stage feel like
+    // a fought-over place. One random sprite per placement, scaled to its art.
+    const tryScatter = (x: number, y: number, tries = 12): boolean => {
+      if (art.scatter.length === 0) return false
+      for (let t = 0; t < tries; t++) {
+        const sp = rng.pick(art.scatter)
+        const probe = new Prop(0, 0, 'scatter', sp)
+        const px = clamp(x + rng.range(-120, 120), 40, WORLD_W - 40)
+        const py = clamp(y + rng.range(-120, 120), 40, WORLD_H - 40)
+        if (free(px, py, probe.r)) {
+          this.props.push(new Prop(px, py, 'scatter', sp))
+          return true
+        }
+      }
+      return false
     }
-    // Fallen logs — destructible low cover that breaks lines of sight.
-    for (let i = 0; i < 6; i++) {
-      tryPlace(rng.range(WORLD_W * 0.25, WORLD_W * 0.9), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'log')
+    // Loose clutter spread over the whole field.
+    for (let i = 0; i < 22 + idx * 2; i++) {
+      tryScatter(rng.range(WORLD_W * 0.18, WORLD_W * 0.92), rng.range(WORLD_H * 0.08, WORLD_H * 0.92))
+    }
+    // A few "junk yards" — tight clusters of wrecks/ruins for set-piece cover.
+    const yards = 3 + Math.floor(idx / 2)
+    for (let f = 0; f < yards; f++) {
+      const cx = rng.range(WORLD_W * 0.25, WORLD_W * 0.9)
+      const cy = rng.range(WORLD_H * 0.12, WORLD_H * 0.88)
+      const n = rng.int(3, 6)
+      for (let i = 0; i < n; i++) tryScatter(cx, cy)
     }
     this.placeDecals(rng, spawn)
   }
