@@ -22,25 +22,31 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill.
 
 ---
 
-## Status (16 jun 2026 — sessie 8)
+## Status (17 jun 2026 — sessie 9)
 
 | Onderdeel | Status |
 |---|---|
-| Core gameplay (move/fire/missiles/formations) | ✅ |
-| 12-missie campagne + endless mode | ✅ |
+| Core gameplay (move/fire/**homing missiles**/formations) | ✅ |
+| 12-missie campagne + endless mode + **stage select** (klikbaar) | ✅ |
 | Economie, bouwen, voertuigen (instappen) | ✅ |
+| **Grotere tanks** (render 66px, collision 42) + jeeps mee opgeschaald | ✅ nieuw |
 | Fog of war, minimap, persistent gore/decals | ✅ |
-| **Boot Hill: 8 marmeren stijlen, family-pictogrammen, scrollende rijen, alle doden** | ✅ nieuw, geverifieerd in browser |
-| AI title/tiles/sprites art (sheet.png, sheet2.png, tiles.png) | ✅ geverifieerd: playerPoses 4, enemyPoses 4, vehicles 4, buildings 6, tiles 8 |
+| **Volledig klikbare UI** (menu, stage rows, shop, S/E/missile/pause, muziek-knoop) | ✅ |
+| **Per-missie biomes** (green/meadow/woodland/autumn/snow), grass-dominant | ✅ |
+| **Ground-decals** (kraters, scorch, bloemvelden) tussen terrein en units | ✅ nieuw |
+| Boot Hill: marmeren stijlen, family-pictogrammen, namen+leeftijd onder de steen | ✅ |
+| AI art: sheet.png, sheet2.png, tiles.png + **Gemini war-factory & civilians** | ✅ |
 | Echte bomen/struiken (CC-BY 3.0) + bos = dekking | ✅ |
 | Depth/occlusie: units lopen achter gebouwen, props & boomstam, onder kruin | ✅ |
-| Environment props met echte sprites: vaten, kratten, zandzak-nesten, struik-thickets | ✅ |
+| Environment props: vaten, kratten, zandzakken, struiken, **rotsen, boomstammen** | ✅ |
+| **Sprite-slicing via connected-components** (geen half-afgesneden tanks/gebouwen meer) | ✅ |
 | Boomstam-collisie (loop om de stam, onder de bladeren door) | ✅ |
 | A* pathfinding + cohesieve squad-follow (routet ook om props/stammen) | ✅ |
-| Per-level muziek (mp3) + titel-mp3 | ✅ |
+| Per-level muziek (mp3) + titel-mp3 (default UIT) | ✅ |
 | Gunfire + gevarieerde hit-grunts | ✅ |
 | GitHub remote + push | ✅ staat erop |
-| Netlify deploy-config | ✅ `netlify.toml` aanwezig (zie Deploy) |
+| GitHub Pages Actions-workflow | ⚠️ `deploy.yml` aanwezig (build slaagt); deploy faalt tot Pages-source op "GitHub Actions" staat (user-actie) |
+| Netlify deploy-config | ✅ `netlify.toml` aanwezig (aanbevolen route — zie Deploy) |
 
 ---
 
@@ -50,9 +56,11 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill.
 |---|---|
 | **LMB** | Beweeg peloton / klik op jeep om in te stappen |
 | **RMB (hold)** | Vuren op crosshair |
-| **G** | Seeking missile (leader vuurt, homing + boom) |
+| **G** | Seeking missile (leader vuurt, homing + boom, detoneert op min-safe-distance) |
 | **S** | Formatie wisselen (column ↔ spread) |
 | **E** | Shop (towers/barracks/factory/recruits/vehicles) |
+
+> **Alles is óók muis-klikbaar:** menu-items, stage-rijen op de stage-select, alle action-bar-knoppen (COLUMN/SPREAD, SHOP, MISSILE, PAUSE) en de muziek-noot (doorgestreept = uit). Geregeld via het generieke `clickZones`-systeem in `game.ts` (render registreert rects, update consumeert kliks).
 | **SPACE** | Uit voertuig stappen; bevestig briefing/debrief |
 | **P** | Pauze aan/uit |
 | **M** | Muziek aan/uit (titel = mp3, in-game = level-track) |
@@ -84,7 +92,7 @@ src/
 │   ├── projectile.ts    Bullet + Missile (homing + boom)
 │   ├── civilian.ts      Paniek, follow, rescue
 │   ├── pickup.ts        Cash / medkit / grenades
-│   └── prop.ts          ★ Battlefield props: barrel (explosief), crate (loot), sandbag (cover), bush (echte tree-art) — alle met echte sprites
+│   └── prop.ts          ★ Battlefield props: barrel (explosief), crate (loot), sandbag (cover), bush (tree-art), rock (procedural massieve cover), log (procedural destructible cover)
 └── game/
     ├── game.ts          ★ Orkestratie (~1400 regels): update, collision, win/lose, fog, depth-sort render, muziek-transities
     ├── squad.ts         ★ Leider-A* + breadcrumb-follow + separatie
@@ -115,7 +123,8 @@ src/
 - `terrain.inCover(x,y)` = onder een kruin. Vijand-AI: spot-range 300→110 onder dekking; al-alerte squad valt terug naar patrol als je >130px de bomen in glipt; schoten trager+wijder. Tanks/torens stoppen met vuren op verstopte squad voorbij ~150/120px.
 
 ### Boot Hill & titel (`game/screens.ts`, `game/roster.ts`, `game/game.ts`)
-- **Tagline (titel):** *"THE DEAD COST NOTHING. / THAT'S WHY THERE'S ALWAYS MORE."* — vervangt de oude "WAR IS HELL. PROFIT IS FOREVER."
+- **Tagline (titel):** *"EITHER WAR IS OBSOLETE OR MEN ARE."* (`screens.ts`, getekend onder de MEAT GRINDER-titel met bounce).
+- **Namen + leeftijd onder de steen:** `nameplate()` tekent een plaatje ONDER elke grafsteen (rank+naam+leeftijd+kills voor soldaten; ENEMY/CIVILIAN+leeftijd anders). Family-pictogrammen vergroot daaronder.
 - **Briefing-backdrop:** `bootHillBackdrop()` tekent `boothill.png` met 50% zwarte overlay achter missietitel + briefingtekst.
 - **Alle doden op de heuvel:** elke missie verzamelt `fallen[]` — eigen KIA's **én** gedode vijanden **én** gedode civilians. Bij win/lose → `addGraves(fallen)` naar `localStorage` `chaosfodder.boothill` (cap 400; bij overflow worden oudste enemy/civilian-graven eerst verwijderd zodat soldaten blijven).
 - **Grave-record (`roster.ts`):** `{ type: 'soldier'|'enemy'|'civilian', name?, age, kills, rank, mission, style (0–7), seed }`. Oudere saves zonder velden worden bij load genormaliseerd.
@@ -127,16 +136,28 @@ src/
 - **Scrollende rijen:** 4 diepte-rijen op de heuvel; passen ze niet op scherm → even rijen scrollen langzaam links, oneven rijen rechts (wobble op oneven). Weinig graven → gecentreerd stilstaand raster.
 - **Header:** telt soldaten / vijanden / civilians apart ("X rest here — Y of ours, Z enemy, W caught between").
 
+### Biomes & tiles (`core/art.ts` → `parseTiles`/`setBiome`, `game.ts` → `loadMission`)
+- Tile-atlas (9×6) wordt in **per-biome paletten** gesneden: `green`, `meadow`, `woodland`, `autumn`, `snow`. Allemaal grass-dominant — geen cobble/asfalt-wegen meer (user vond die "kut"). Alleen water blokkeert; grond-tiles zijn decoratie.
+- `loadMission` kiest een biome uit een vaste `BIOMES`-lijst op missie-index en roept `art.setBiome(...)` **vóór** `new Terrain(...)` zodat de terrein-generator het juiste palet leest. Endless = `green`.
+
+### Sprite-slicing (`core/art.ts` → `detectSpriteRows`, `keyOutFlatGrey`, `parseGemini`)
+- **`detectSpriteRows()`** doet connected-component-detectie (flood-fill → rijen) i.p.v. een vast 4×4-grid. Loste de half-afgesneden tanks/gebouwen op (brede voertuigen straddelden de cel-randen).
+- **`keyOutFlatGrey()`** keyt de neutraal-grijze (~120/180) checkerboard-achtergrond van de Gemini-image naar transparant (`keyOutBackground` keyde alleen near-white).
+- **`parseGemini()`** haalt uit `public/art/gemini.png` ALLEEN de **war-factory** (grootste blob bovenin) + de **civilians** (onderste band, L→R). Barracks blijft bewust de oude sheet2-sprite.
+
 ### Depth & occlusie (`game/game.ts` → `renderWorld`, `world/terrain.ts`, `entities/prop.ts`)
 - **Depth-sorted actor-pass:** gebouwen, props, voertuigen, civilians én soldaten gaan in één lijst, gesorteerd op voet-Y (`sortY`), en worden back-to-front getekend. Gevolg: een unit **noordelijk** van een gebouw/krat/struik valt er correct **achter** weg en stapt **ervoor** zodra hij naar beneden loopt. Pickups eronder, boom-kruinen erboven.
 - **Boomstam:** elke boom heeft naast de cover-radius (`r`) een kleine solide **trunk-radius** (`tr`, ≤8px) in `terrain.trunkBlocked()`. Die zit in `blockTest` → units (en de A*-pathfinder) lopen **om de stam** terwijl de kruin (`renderCanopies`) er nog steeds overheen tekent: je loopt *achter de stam langs, onder de bladeren door*.
 
-### Environment props (`entities/prop.ts`, `game.ts` → `placeProps`/`onPropDestroyed`)
-- Vier soorten, per missie geschaald (`placeProps`, density ∝ missie-index):
+### Environment props & decals (`entities/prop.ts`, `game.ts` → `placeProps`/`placeDecals`/`renderDecals`)
+- Zes prop-soorten, per missie geschaald (`placeProps`, density ∝ missie-index):
   - **`barrel`** — explosief (olijf-metalen drum). Kapotschieten → `explode()` die **buur-vaten kettingt** (Postal-chaos). Geverifieerd in browser: trio detoneert in één klap, geen recursion-crash.
   - **`crate`** — destructible loot-cover (houten munitie-kist); sloop dropt cash/medkit/grenades (70%).
   - **`sandbag`** — taaie cover (zandzak-muur, hp 200); houdt vuur tegen tot een blast/zware beschieting hem sloopt.
   - **`bush`** — **echte top-down tree-art** (foliage-pack), solide thicket, onverwoestbaar natuurlijk dekking.
+  - **`rock`** — procedureel getekend grijs rotsblok (clusters 2–5), onverwoestbaar massieve cover; kogels stoppen erop.
+  - **`log`** — procedureel getekende omgevallen boomstam, destructible lage cover die zichtlijnen breekt.
+- **Ground-decals** (`placeDecals`/`renderDecals`) — **geen collision**, getekend tussen terrein en actors via de `Decal`-interface (`game.ts`): granaat-**kraters**, **scorch**-marks en **bloemvelden**. Puur decoratief; geeft elk veld een uitgevochten, doorleefde look. Density ∝ missie-index, deterministisch uit de RNG-seed.
 - **Collisie:** alle props zitten in `blockTest` (radius-cirkel) → tegelijk movement-blokkade én pad-obstakel én cover (kogels stoppen erop via `collideBullet`). Vaten/kratten/zandzakken ook in `explode()` zodat blasts ze meenemen.
 - **Echte sprites:** barrel/crate/sandbag worden uit een militaire top-down asset-pack (`art/asses.png`) gesneden. `scripts/extract-props.cjs` (pure-JS `pngjs`, dev-dep) cropt de sprites, keyt de licht-grijze achtergrond naar transparant en trimt ze; output staat in `public/art/props/{barrel,crate,sandbag}.png` en wordt door `art.ts` (`art.props`) geladen. Bushes blijven echte foliage-PNG's. Procedurele fallback in `prop.ts` blijft bestaan voor als een sprite ontbreekt. Bronsheets (`art/asses.png`, `art/barrel.png`) staan in de gitignored `art/`-map; alleen de kleine uitgesneden props worden gecommit.
 
@@ -158,7 +179,8 @@ src/
 | `public/art/tiles.png` | 9×6 tile-atlas (grass/dirt/water/forest) |
 | `public/art/trees/` | 47 top-down boom/struik PNGs (chabull, opengameart, **CC-BY 3.0**, credit in README) |
 | `public/art/boothill.png` | Boot Hill banner + briefing-backdrop |
-| `public/art/props/` | Uitgesneden barrel/crate/sandbag sprites (`scripts/extract-props.cjs`) |
+| `public/art/gemini.png` | Gemini-image (1408×768, grijze checkerboard) → war-factory + civilians (`parseGemini`) |
+| `public/art/props/` | Uitgesneden barrel/crate/sandbag sprites (`scripts/extract-props.cjs`); rock/log zijn procedureel |
 | `public/audio/title.mp3` | Titelmuziek (Stoppadawar) |
 | `public/audio/level{1,2,3}.mp3` | Level-muziek (RAWONON / SWOEWM / RuimteNietBeschikbaar) |
 | `art/` (root) | Bron-images — **niet geladen door Vite**, `/art/` is gegitignored. Bevat o.a. `asses.png`, `barrel.png`, `people.png`, `picto.png` (referentie voor family-pictogrammen) |
@@ -191,7 +213,7 @@ Statische Vite-build (`npm run build` → `dist/`, ~86KB JS gzip 28KB; `dist/` i
   - A) app.netlify.com → Import → GitHub → `KAasman66/huhhuhgame` → Deploy (auto-deploy per push).
   - B) app.netlify.com/drop → sleep `dist/` erin (handmatig, geen Git).
   - *Account-acties (inloggen/Deploy klikken) doet de user zelf.*
-- **GitHub Pages:** serveert onder `/huhhuhgame/` → absolute `/art`+`/audio` paden **404'en**. Vereist: asset-paden relatief maken (`import.meta.env.BASE_URL`-prefix in `art.ts` + `audio.ts`), `base:'/huhhuhgame/'` in `vite.config.js`, en een Actions deploy-workflow. ~20 min werk; nog niet gedaan.
+- **GitHub Pages:** `.github/workflows/deploy.yml` staat klaar (build via `npm install` — niet `npm ci`, want de lockfile is op Windows gemaakt en Vite's rolldown pulls platform-specifieke native deps). De **build-job slaagt**, maar de **deploy-job faalt** zolang de Pages-source niet op "GitHub Actions" staat (Pages API 404). Dat is een **user-actie** in de repo-settings; daarna deployt elke push automatisch. Asset-paden gebruiken absolute `/art`+`/audio` — werkt op Pages alleen als de site op het root-domein staat (user-Pages of custom domain), niet onder `/huhhuhgame/`. User koos voorlopig Netlify Drop.
 
 ---
 
@@ -212,4 +234,4 @@ Handmatig: `npm run dev` → ENTER → SPACE (briefing) → LMB move, RMB hold t
 
 ---
 
-*Bijgewerkt: 16 jun 2026 (sessie 8) — Boot Hill volledig herbouwd: 8 marmeren stijlen, family-pictogrammen (1–6 personen/pets per steen, geïnspireerd op art/picto.png) op alle graven, scrollende rijen, carveFit voor namen, nieuwe cynische tagline, briefing met Boot Hill-backdrop, en alle doden (soldier/enemy/civilian) worden opgeslagen met leeftijd. Eerder: environment props met echte sprites, depth/occlusie, boomstam-collisie, MEAT GRINDER rename.*
+*Bijgewerkt: 17 jun 2026 (sessie 9) — Grotere tanks (render 66px / collision 42, jeeps mee opgeschaald) en rijkere battlefields: nieuwe props `rock` (massieve cover) + `log` (destructible cover) plus niet-collidende ground-decals (kraters, scorch, bloemvelden) tussen terrein en units. Eerder deze sessie-reeks: nieuwe tagline "Either war is obsolete or men are.", per-missie biomes (grass-dominant, geen wegen), volledig klikbare UI + stage select, homing missiles i.p.v. grenades, connected-component sprite-slicing (geen half-afgesneden tanks/gebouwen), Gemini war-factory + civilians, muziek default uit, MEAT GRINDER rename, Boot Hill met namen+leeftijd onder de stenen.*
