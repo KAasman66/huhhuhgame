@@ -38,6 +38,8 @@ export class Terrain {
    * walks *around / behind* the stem while still passing *under* the leaves.
    */
   trees: { x: number; y: number; r: number; tr: number; sp: Sprite | null; w: number; h: number }[] = []
+  /** Centre Y of the winding road at this stage's seed (set during generate). */
+  private roadCenterY = 0
 
   constructor(
     public w: number,
@@ -66,6 +68,7 @@ export class Terrain {
     const rng = new RNG(seed)
     const ctx = this.base.getContext('2d')!
     const layout = this.computeLayout(rng)
+    this.roadCenterY = layout.roadY
 
     const tiles = art.tiles
     const useArt =
@@ -229,6 +232,11 @@ export class Terrain {
 
   private roadYAt(roadY: number, x: number): number {
     return roadY + Math.sin(x * 0.004) * 60
+  }
+
+  /** Public road centre-line Y at a given world X (for coherent stage layout). */
+  roadAt(x: number): number {
+    return this.roadYAt(this.roadCenterY, x)
   }
 
   private markBlocked(layout: Layout) {

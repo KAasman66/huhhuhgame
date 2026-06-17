@@ -66,6 +66,8 @@ export class Game {
   buildings: Building[] = []
   civilians: Civilian[] = []
   animals: Animal[] = []
+  /** Ruined-village anchor points; civilians, dogs and ruins cluster here. */
+  settlements: { x: number; y: number; r: number }[] = []
   props: Prop[] = []
   decals: Decal[] = []
   bullets: Bullet[] = []
@@ -265,17 +267,36 @@ export class Game {
       this.enemyVehicles.push(new Vehicle(p.x, p.y, 'tank', 'enemy'))
     }
 
-    // Civilians
+    // Plan ruined villages along the road — these anchor ruins, civilians and
+    // wildlife so each stage reads as fought-over inhabited terrain, not noise.
+    this.settlements = []
+    const villageCount = 1 + Math.floor((this.endlessMode ? 6 : this.missionIdx) / 4)
+    for (let v = 0; v < villageCount; v++) {
+      const vx = WORLD_W * (0.34 + v * 0.26) + rng.range(-90, 90)
+      const side = rng.chance(0.5) ? -1 : 1
+      const vy = clamp(this.terrain.roadAt(vx) + side * rng.range(150, 240), 200, WORLD_H - 200)
+      const a = this.findOpen(vx, vy)
+      this.settlements.push({ x: a.x, y: a.y, r: rng.range(130, 180) })
+    }
+
+    // Civilians live in (or flee toward) the villages.
     for (let i = 0; i < def.civilians; i++) {
-      const p = this.findOpen(rng.range(WORLD_W * 0.25, WORLD_W * 0.75), rng.range(WORLD_H * 0.15, WORLD_H * 0.85))
+      const s = this.settlements.length ? rng.pick(this.settlements) : { x: WORLD_W / 2, y: WORLD_H / 2, r: 300 }
+      const p = this.findOpen(s.x + rng.range(-s.r, s.r), s.y + rng.range(-s.r, s.r))
       this.civilians.push(new Civilian(p.x, p.y))
     }
 
-    // Ambient wildlife — a handful of dogs and pigs roaming the map. They flee
+    // Stray dogs hang around the settlements (and a couple roam free). They flee
     // gunfire but never fight or block; pure atmosphere.
     const animalCount = 4 + rng.int(0, 3)
     for (let i = 0; i < animalCount; i++) {
-      const p = this.findOpen(rng.range(WORLD_W * 0.2, WORLD_W * 0.85), rng.range(WORLD_H * 0.12, WORLD_H * 0.88))
+      let p
+      if (this.settlements.length && i < animalCount - 1) {
+        const s = rng.pick(this.settlements)
+        p = this.findOpen(s.x + rng.range(-s.r, s.r), s.y + rng.range(-s.r, s.r))
+      } else {
+        p = this.findOpen(rng.range(WORLD_W * 0.2, WORLD_W * 0.85), rng.range(WORLD_H * 0.12, WORLD_H * 0.88))
+      }
       this.animals.push(new Animal(p.x, p.y, 'dog'))
     }
 
@@ -312,10 +333,12 @@ export class Game {
   }
 
   /**
-   * Scatter destructible clutter across the battlefield: explosive barrels
-   * (chain reactions), supply crates (cover + loot), sandbag nests and boulders.
-   * They have real collision and depth, so the squad fights around and behind
-   * them. Density scales with mission index for escalating chaos.
+   * Lay out the stage as a *place*, not a sprinkle: ruined villages along the
+   * road (ruins + fences + civvy clutter), wrecks and debris strung down the
+   * roadway, a forward defensive line of sandbags/barrels guarding the enemy
+   * base, foliage hugging the treeline, and only light clutter in the open.
+   * Everything keys off the terrain (road, forest) and the planned settlements
+   * so each map reads coherently. Density scales with mission index.
    */
   private placeProps(rng: RNG, spawn: { x: number; y: number }) {
     const idx = this.endlessMode ? 6 : this.missionIdx
@@ -328,11 +351,12 @@ export class Game {
       for (const p of this.props) if (dist(x, y, p.x, p.y) < p.r + r + 6) return false
       return true
     }
-    const tryPlace = (x: number, y: number, kind: PropKind, tries = 10): boolean => {
+    // Place a fixed-kind prop near (x,y) within a given jitter radius.
+    const place = (x: number, y: number, kind: PropKind, spread = 70, tries = 10): boolean => {
       const r = new Prop(0, 0, kind).r
       for (let t = 0; t < tries; t++) {
-        const px = clamp(x + rng.range(-90, 90), 40, WORLD_W - 40)
-        const py = clamp(y + rng.range(-90, 90), 40, WORLD_H - 40)
+        const px = clamp(x + rng.range(-spread, spread), 40, WORLD_W - 40)
+        const py = clamp(y + rng.range(-spread, spread), 40, WORLD_H - 40)
         if (free(px, py, r)) {
           this.props.push(new Prop(px, py, kind))
           return true
@@ -341,40 +365,21 @@ export class Game {
       return false
     }
 
-    // Barrel clusters — the fun stuff. More, and bigger, deeper in the campaign.
-    const clusters = 3 + Math.floor(idx / 2)
-    for (let c = 0; c < clusters; c++) {
-      const cx = rng.range(WORLD_W * 0.35, WORLD_W * 0.92)
-      const cy = rng.range(WORLD_H * 0.12, WORLD_H * 0.88)
-      const n = rng.int(2, 4)
-      for (let i = 0; i < n; i++) tryPlace(cx, cy, 'barrel')
-    }
-    // A few barrels hugging the enemy base for satisfying breaches.
-    const hq = this.buildings.find((b) => b.type === 'hq' && b.side === 'enemy')
-    if (hq) for (let i = 0; i < 3; i++) tryPlace(hq.x - 70, hq.y, 'barrel')
-
-    // Supply crates (loot) and sandbag nests (tough cover) around the mid-field.
-    for (let i = 0; i < 4 + Math.floor(idx / 2); i++) {
-      tryPlace(rng.range(WORLD_W * 0.3, WORLD_W * 0.85), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'crate')
-    }
-    for (let i = 0; i < 4 + Math.floor(idx / 2); i++) {
-      tryPlace(rng.range(WORLD_W * 0.3, WORLD_W * 0.88), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'sandbag')
-    }
-    // Dense foliage thickets (real tree art) for natural cover you move behind.
-    for (let i = 0; i < 14; i++) {
-      tryPlace(rng.range(WORLD_W * 0.2, WORLD_W * 0.92), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'bush')
-    }
-
-    // Scatter pack (more.png): wrecked cars, ruins, barriers, fences, dead
-    // trees, rocks, debris — real solid cover that makes every stage feel like
-    // a fought-over place. One random sprite per placement, scaled to its art.
-    const tryScatter = (x: number, y: number, tries = 12): boolean => {
-      if (art.scatter.length === 0) return false
+    // Scatter pools, classified by sprite shape so the right thing lands in the
+    // right place: wide sprites read as wrecked vehicles, big blocky ones as
+    // ruined buildings, the rest as assorted junk/debris.
+    const all = art.scatter
+    const vehicles = all.filter((s) => s.w > 70 && s.w >= s.h * 1.2)
+    const ruins = all.filter((s) => s.w > 88 && s.h > 88)
+    const junk = all.filter((s) => !vehicles.includes(s) && !ruins.includes(s))
+    const placeFrom = (pool: typeof all, x: number, y: number, spread = 70, tries = 14): boolean => {
+      const src = pool.length ? pool : all
+      if (!src.length) return false
       for (let t = 0; t < tries; t++) {
-        const sp = rng.pick(art.scatter)
+        const sp = rng.pick(src)
         const probe = new Prop(0, 0, 'scatter', sp)
-        const px = clamp(x + rng.range(-120, 120), 40, WORLD_W - 40)
-        const py = clamp(y + rng.range(-120, 120), 40, WORLD_H - 40)
+        const px = clamp(x + rng.range(-spread, spread), 40, WORLD_W - 40)
+        const py = clamp(y + rng.range(-spread, spread), 40, WORLD_H - 40)
         if (free(px, py, probe.r)) {
           this.props.push(new Prop(px, py, 'scatter', sp))
           return true
@@ -382,18 +387,64 @@ export class Game {
       }
       return false
     }
-    // Loose clutter spread over the whole field.
-    for (let i = 0; i < 22 + idx * 2; i++) {
-      tryScatter(rng.range(WORLD_W * 0.18, WORLD_W * 0.92), rng.range(WORLD_H * 0.08, WORLD_H * 0.92))
+
+    // --- Ruined villages: ruins ringed by fences/junk, with barrels & crates
+    //     (loot) tucked among the rubble. Civilians already cluster here. ---
+    for (const s of this.settlements) {
+      const houses = rng.int(3, 5)
+      for (let i = 0; i < houses; i++) {
+        const a = (i / houses) * Math.PI * 2 + rng.range(-0.4, 0.4)
+        const rr = rng.range(0, s.r * 0.7)
+        placeFrom(ruins, s.x + Math.cos(a) * rr, s.y + Math.sin(a) * rr, 30)
+      }
+      for (let i = 0; i < rng.int(4, 7); i++) placeFrom(junk, s.x, s.y, s.r)
+      for (let i = 0; i < rng.int(2, 4); i++) place(s.x, s.y, 'crate', s.r * 0.8)
+      for (let i = 0; i < rng.int(1, 3); i++) place(s.x, s.y, 'barrel', s.r * 0.8)
     }
-    // A few "junk yards" — tight clusters of wrecks/ruins for set-piece cover.
-    const yards = 3 + Math.floor(idx / 2)
-    for (let f = 0; f < yards; f++) {
-      const cx = rng.range(WORLD_W * 0.25, WORLD_W * 0.9)
+
+    // --- Roadway: broken-down wrecks and scattered debris along the route,
+    //     the way a column dies on the march. ---
+    for (let x = WORLD_W * 0.22; x < WORLD_W * 0.92; x += rng.range(220, 340)) {
+      const ry = this.terrain.roadAt(x)
+      placeFrom(vehicles, x, ry + rng.range(-30, 30), 40)
+      for (let i = 0; i < rng.int(1, 3); i++) placeFrom(junk, x + rng.range(-60, 60), ry + rng.range(-50, 50), 30)
+    }
+
+    // --- Forward defensive line: sandbags + barrels arced in front of the
+    //     enemy HQ, so breaching the base feels like cracking a position. ---
+    const hq = this.buildings.find((b) => b.type === 'hq' && b.side === 'enemy')
+    if (hq) {
+      const lx = hq.x - rng.range(150, 200)
+      const span = 4 + Math.floor(idx / 3)
+      for (let i = 0; i < span; i++) {
+        const ly = hq.y + (i - (span - 1) / 2) * 60
+        place(lx, ly, 'sandbag', 30)
+        if (rng.chance(0.5)) place(lx - 24, ly, 'barrel', 24)
+      }
+    }
+
+    // --- Treeline cover: bushes and a little junk hugging the forest clumps. ---
+    const clumps = this.terrain.trees
+    for (let i = 0; i < 14; i++) {
+      const t = clumps.length ? clumps[rng.int(0, clumps.length - 1)] : { x: rng.range(0, WORLD_W), y: rng.range(0, WORLD_H) }
+      place(t.x, t.y, 'bush', 80)
+    }
+    for (let i = 0; i < 6 && clumps.length; i++) {
+      const t = clumps[rng.int(0, clumps.length - 1)]
+      placeFrom(junk, t.x, t.y, 70)
+    }
+
+    // --- Open ground: only light, sparse clutter so the field still breathes. ---
+    for (let i = 0; i < 8 + idx; i++) {
+      placeFrom(junk, rng.range(WORLD_W * 0.2, WORLD_W * 0.9), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 110)
+    }
+    for (let i = 0; i < 3 + Math.floor(idx / 2); i++) {
+      const cx = rng.range(WORLD_W * 0.35, WORLD_W * 0.92)
       const cy = rng.range(WORLD_H * 0.12, WORLD_H * 0.88)
-      const n = rng.int(3, 6)
-      for (let i = 0; i < n; i++) tryScatter(cx, cy)
+      const n = rng.int(2, 4)
+      for (let k = 0; k < n; k++) place(cx, cy, 'barrel', 60)
     }
+
     this.placeDecals(rng, spawn)
   }
 
