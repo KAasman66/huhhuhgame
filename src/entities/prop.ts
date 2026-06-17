@@ -1,6 +1,6 @@
 import { art, Sprite } from '../core/art'
 
-export type PropKind = 'barrel' | 'crate' | 'sandbag' | 'bush'
+export type PropKind = 'barrel' | 'crate' | 'sandbag' | 'bush' | 'rock' | 'log'
 
 interface PropSpec {
   hp: number
@@ -17,6 +17,8 @@ const SPECS: Record<PropKind, PropSpec> = {
   crate: { hp: 45, destructible: true, explosive: false, drawW: 30, r: 13 },
   sandbag: { hp: 200, destructible: true, explosive: false, drawW: 54, r: 20 },
   bush: { hp: Infinity, destructible: false, explosive: false, drawW: 46, r: 16 },
+  rock: { hp: Infinity, destructible: false, explosive: false, drawW: 40, r: 17 },
+  log: { hp: 60, destructible: true, explosive: false, drawW: 50, r: 14 },
 }
 
 /**
@@ -38,6 +40,7 @@ export class Prop {
   sp: Sprite | null = null
   dw = 0
   dh = 0
+  seed = Math.random()
 
   constructor(
     public x: number,
@@ -55,7 +58,7 @@ export class Prop {
       const pool = art.trees.filter((t) => Math.max(t.w, t.h) > 50)
       const src = pool.length > 0 ? pool : art.trees
       this.sp = src.length > 0 ? src[(Math.random() * src.length) | 0] : null
-    } else {
+    } else if (kind === 'barrel' || kind === 'crate' || kind === 'sandbag') {
       this.sp = art.props[kind]
     }
 
@@ -136,6 +139,50 @@ export class Prop {
     } else if (this.kind === 'sandbag') {
       ctx.fillStyle = '#b9a468'
       ctx.fillRect(x - r, y - r * 0.5, r * 2, r)
+    } else if (this.kind === 'rock') {
+      // Weathered grey boulder cluster with a lit top-left facet.
+      const wob = 0.7 + this.seed * 0.5
+      ctx.fillStyle = '#6c6f73'
+      ctx.beginPath()
+      ctx.moveTo(x - r, y + r * 0.4)
+      ctx.quadraticCurveTo(x - r * wob, y - r * 0.9, x, y - r)
+      ctx.quadraticCurveTo(x + r * wob, y - r * 0.7, x + r, y + r * 0.3)
+      ctx.quadraticCurveTo(x + r * 0.5, y + r * 0.7, x, y + r * 0.6)
+      ctx.quadraticCurveTo(x - r * 0.6, y + r * 0.7, x - r, y + r * 0.4)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#888c90'
+      ctx.beginPath()
+      ctx.moveTo(x - r * 0.6, y - r * 0.1)
+      ctx.quadraticCurveTo(x - r * 0.3, y - r * 0.8, x + r * 0.1, y - r * 0.6)
+      ctx.quadraticCurveTo(x - r * 0.1, y - r * 0.2, x - r * 0.6, y - r * 0.1)
+      ctx.fill()
+      ctx.strokeStyle = '#494c50'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(x - r * 0.2, y - r * 0.5)
+      ctx.lineTo(x + r * 0.1, y + r * 0.3)
+      ctx.stroke()
+    } else if (this.kind === 'log') {
+      // Fallen log lying across the field, light cut-ends.
+      const hl = r * 1.4
+      ctx.fillStyle = '#5a3f22'
+      ctx.fillRect(x - hl, y - r * 0.55, hl * 2, r * 1.1)
+      ctx.fillStyle = '#caa46a'
+      ctx.beginPath()
+      ctx.ellipse(x - hl, y, r * 0.32, r * 0.55, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.ellipse(x + hl, y, r * 0.32, r * 0.55, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#3c2a16'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(x - hl * 0.4, y - r * 0.5)
+      ctx.lineTo(x - hl * 0.4, y + r * 0.5)
+      ctx.moveTo(x + hl * 0.3, y - r * 0.5)
+      ctx.lineTo(x + hl * 0.3, y + r * 0.5)
+      ctx.stroke()
     } else {
       ctx.fillStyle = '#7c5a2e'
       ctx.fillRect(x - r, y - r, r * 2, r * 2)

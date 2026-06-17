@@ -28,6 +28,15 @@ export const WORLD_H = 1500
 
 export type Screen = 'title' | 'briefing' | 'playing' | 'debrief' | 'gameover' | 'boothill'
 
+/** Non-colliding ground decoration drawn between terrain and actors. */
+export interface Decal {
+  x: number
+  y: number
+  r: number
+  seed: number
+  kind: 'crater' | 'scorch' | 'flowers'
+}
+
 const KILL_QUIPS = ['Got him!', 'Down!', 'Eat dirt!', 'Next!', 'Tango down!', 'Ha!']
 const CIV_QUIPS = ['YOU MONSTER', 'OOPS...', 'THAT WAS A CIVILIAN', 'WAR CRIME ALERT']
 
@@ -56,6 +65,7 @@ export class Game {
   buildings: Building[] = []
   civilians: Civilian[] = []
   props: Prop[] = []
+  decals: Decal[] = []
   bullets: Bullet[] = []
   missiles: Missile[] = []
   pickups: Pickup[] = []
@@ -340,8 +350,82 @@ export class Game {
       tryPlace(rng.range(WORLD_W * 0.3, WORLD_W * 0.88), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'sandbag')
     }
     // Dense foliage thickets (real tree art) for natural cover you move behind.
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 14; i++) {
       tryPlace(rng.range(WORLD_W * 0.2, WORLD_W * 0.92), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'bush')
+    }
+    // Boulder fields — solid cover that bullets stop on, scattered in clusters.
+    const rockFields = 3 + Math.floor(idx / 3)
+    for (let f = 0; f < rockFields; f++) {
+      const cx = rng.range(WORLD_W * 0.25, WORLD_W * 0.9)
+      const cy = rng.range(WORLD_H * 0.1, WORLD_H * 0.9)
+      const n = rng.int(2, 5)
+      for (let i = 0; i < n; i++) tryPlace(cx, cy, 'rock')
+    }
+    // Fallen logs — destructible low cover that breaks lines of sight.
+    for (let i = 0; i < 6; i++) {
+      tryPlace(rng.range(WORLD_W * 0.25, WORLD_W * 0.9), rng.range(WORLD_H * 0.1, WORLD_H * 0.9), 'log')
+    }
+    this.placeDecals(rng, spawn)
+  }
+
+  /**
+   * Non-colliding ground decals — shell craters, scorch marks and flower
+   * patches drawn between terrain and the actors. Pure decoration that makes
+   * each field read as a lived-in, fought-over place without affecting play.
+   */
+  private placeDecals(rng: RNG, spawn: { x: number; y: number }) {
+    const idx = this.endlessMode ? 6 : this.missionIdx
+    this.decals = []
+    const add = (kind: Decal['kind'], count: number, rMin: number, rMax: number) => {
+      for (let i = 0; i < count; i++) {
+        const x = rng.range(60, WORLD_W - 60)
+        const y = rng.range(60, WORLD_H - 60)
+        if (dist(x, y, spawn.x, spawn.y) < 160) continue
+        this.decals.push({ x, y, kind, r: rng.range(rMin, rMax), seed: rng.range(0, 1) })
+      }
+    }
+    add('crater', 6 + idx, 16, 34)
+    add('scorch', 8 + idx, 14, 30)
+    add('flowers', 22, 10, 20)
+  }
+
+  private renderDecals(ctx: CanvasRenderingContext2D) {
+    const cam = this.camera
+    for (const d of this.decals) {
+      if (d.x < cam.x - 40 || d.x > cam.x + VIEW_W + 40 || d.y < cam.y - 40 || d.y > cam.y + VIEW_H + 40) continue
+      if (!this.fog.isExplored(d.x, d.y)) continue
+      if (d.kind === 'crater') {
+        ctx.fillStyle = 'rgba(40,30,22,0.55)'
+        ctx.beginPath()
+        ctx.ellipse(d.x, d.y, d.r, d.r * 0.72, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = 'rgba(20,14,10,0.6)'
+        ctx.beginPath()
+        ctx.ellipse(d.x, d.y, d.r * 0.55, d.r * 0.4, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = 'rgba(90,72,50,0.4)'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.ellipse(d.x, d.y, d.r, d.r * 0.72, 0, 0, Math.PI * 2)
+        ctx.stroke()
+      } else if (d.kind === 'scorch') {
+        ctx.fillStyle = 'rgba(18,16,14,0.4)'
+        ctx.beginPath()
+        ctx.ellipse(d.x, d.y, d.r, d.r * 0.78, d.seed * 3, 0, Math.PI * 2)
+        ctx.fill()
+      } else {
+        // Flower patch — little dots of seasonal colour over the grass.
+        const cols = ['#f2d24a', '#e86a8c', '#ffffff', '#b97bd6']
+        const n = 5 + ((d.seed * 6) | 0)
+        for (let i = 0; i < n; i++) {
+          const a = d.seed * 6.28 + i * 2.4
+          const rr = (i / n) * d.r
+          ctx.fillStyle = cols[(i + ((d.seed * 4) | 0)) % cols.length]
+          ctx.beginPath()
+          ctx.arc(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr * 0.8, 1.8, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
     }
   }
 
@@ -1576,6 +1660,7 @@ export class Game {
     cam.begin(ctx)
 
     this.terrain.render(ctx, cam.x, cam.y, VIEW_W, VIEW_H)
+    this.renderDecals(ctx)
 
     // Evac zone
     if (this.extraction && (this.mission.kind === 'rescue' || this.civilians.some((c) => c.following))) {

@@ -19,8 +19,8 @@ export interface VehicleStats {
 }
 
 export const VEHICLE_STATS: Record<VehicleType, VehicleStats> = {
-  jeep: { name: 'JEEP', hp: 200, speed: 215, turnRate: 4.2, cost: 550, fireInterval: 0.09, range: 280, dmg: 9, boom: 0, size: 24 },
-  tank: { name: 'TANK', hp: 480, speed: 110, turnRate: 2.4, cost: 1100, fireInterval: 1.1, range: 330, dmg: 70, boom: 55, size: 32 },
+  jeep: { name: 'JEEP', hp: 200, speed: 215, turnRate: 4.2, cost: 550, fireInterval: 0.09, range: 280, dmg: 9, boom: 0, size: 28 },
+  tank: { name: 'TANK', hp: 480, speed: 110, turnRate: 2.4, cost: 1100, fireInterval: 1.1, range: 330, dmg: 70, boom: 55, size: 42 },
 }
 
 function angleDiff(a: number, b: number): number {
@@ -150,7 +150,7 @@ export class Vehicle {
       ctx.save()
       ctx.translate(x, y)
       ctx.rotate(this.angle + Math.PI / 2)
-      const len = this.type === 'tank' ? 48 : 38
+      const len = this.type === 'tank' ? 66 : 44
       const w = (len * sp.w) / sp.h
       ctx.drawImage(sp.c, -w / 2, -len / 2, w, len)
       ctx.restore()
