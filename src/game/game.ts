@@ -1171,6 +1171,12 @@ export class Game {
           }
         }
         this.squad.moveTo(wx, wy)
+        // Double-click → double-time. The squad sprints (run time per rank).
+        if (click.double && this.squad.sprint()) {
+          const p = this.squad.pos()
+          if (p) this.fx.text(p.x, p.y - 22, 'DOUBLE TIME!', '#ffe08a', 12)
+          sfx.click()
+        }
       } else if (click.button === 2 && this.buildMode) {
         this.buildMode = null
       }

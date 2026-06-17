@@ -55,6 +55,7 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill.
 | Input | Actie |
 |---|---|
 | **LMB** | Beweeg peloton / klik op jeep om in te stappen |
+| **Double-LMB** | **Double-time!** Squad sprint (1.85×) naar de plek; looptijd ∝ rank (PVT 1.4s → CPT 3.2s), daarna 4.5s cooldown per soldaat. Stof-trail + "DOUBLE TIME!"-cue |
 | **RMB (hold)** | Vuren op crosshair |
 | **G** | Seeking missile (leader vuurt, homing + boom, detoneert op min-safe-distance) |
 | **S** | Formatie wisselen (column ↔ spread) |

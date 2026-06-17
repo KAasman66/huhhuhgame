@@ -2,6 +2,8 @@ export interface ClickEvent {
   x: number
   y: number
   button: 0 | 2
+  /** True when this click is the second of a quick double-click (left button). */
+  double: boolean
 }
 
 /**
@@ -16,6 +18,9 @@ export class Input {
   leftDown = false
   rightDown = false
   clicks: ClickEvent[] = []
+  private lastLeftAt = -1
+  private lastLeftX = 0
+  private lastLeftY = 0
 
   constructor(private canvas: HTMLCanvasElement) {
     window.addEventListener('keydown', (e) => {
@@ -42,10 +47,15 @@ export class Input {
       this.my = p.y
       if (e.button === 0) {
         this.leftDown = true
-        this.clicks.push({ x: p.x, y: p.y, button: 0 })
+        const now = performance.now()
+        const dbl = now - this.lastLeftAt < 320 && Math.hypot(p.x - this.lastLeftX, p.y - this.lastLeftY) < 30
+        this.clicks.push({ x: p.x, y: p.y, button: 0, double: dbl })
+        this.lastLeftAt = dbl ? -1 : now
+        this.lastLeftX = p.x
+        this.lastLeftY = p.y
       } else if (e.button === 2) {
         this.rightDown = true
-        this.clicks.push({ x: p.x, y: p.y, button: 2 })
+        this.clicks.push({ x: p.x, y: p.y, button: 2, double: false })
       }
     })
     window.addEventListener('mouseup', (e) => {

@@ -29,6 +29,10 @@ export class Soldier {
   tx: number | null = null
   ty: number | null = null
   colors: SoldierColors
+  /** Remaining sprint time (s); >0 means currently running faster. */
+  sprintTime = 0
+  /** Lockout before this soldier can sprint again (s). */
+  sprintCd = 0
 
   constructor(
     public x: number,
@@ -49,6 +53,23 @@ export class Soldier {
   /** Higher rank shoots faster. Cannon Fodder veterans were deadly. */
   fireInterval(): number {
     return 0.19 - this.rank() * 0.022
+  }
+
+  /** How long this soldier can sprint — fitter veterans run longer. */
+  sprintDuration(): number {
+    return 1.4 + this.rank() * 0.6 // PVT 1.4s → CPT 3.2s
+  }
+
+  /** Kick off a sprint if not on cooldown. Returns true if it started. */
+  sprint(): boolean {
+    if (!this.alive || this.sprintCd > 0) return false
+    this.sprintTime = this.sprintDuration()
+    this.sprintCd = this.sprintTime + 4.5 // run, then a cooldown before the next dash
+    return true
+  }
+
+  sprintReady(): boolean {
+    return this.sprintCd <= 0
   }
 
   range(): number {
@@ -84,7 +105,10 @@ export class Soldier {
   update(dt: number, isBlocked: BlockTest) {
     if (!this.alive) return
     this.fireCd = Math.max(0, this.fireCd - dt)
+    this.sprintCd = Math.max(0, this.sprintCd - dt)
+    this.sprintTime = Math.max(0, this.sprintTime - dt)
     this.moving = false
+    const spd = this.sprintTime > 0 ? this.speed * 1.85 : this.speed
 
     if (this.tx !== null && this.ty !== null) {
       const d = dist(this.x, this.y, this.tx, this.ty)
@@ -99,7 +123,7 @@ export class Soldier {
       } else {
         const a = angleTo(this.x, this.y, this.tx, this.ty)
         this.angle = a
-        const step = Math.min(this.speed * dt, d)
+        const step = Math.min(spd * dt, d)
         const nx = this.x + Math.cos(a) * step
         const ny = this.y + Math.sin(a) * step
         if (!isBlocked(nx, ny)) {
@@ -117,7 +141,7 @@ export class Soldier {
         }
       }
     }
-    if (this.moving) this.walkPhase += dt * 11
+    if (this.moving) this.walkPhase += dt * (this.sprintTime > 0 ? 18 : 11)
   }
 
   damage(amount: number): boolean {
@@ -139,6 +163,20 @@ export class Soldier {
     ctx.beginPath()
     ctx.ellipse(x, y + 6, 7, 3, 0, 0, Math.PI * 2)
     ctx.fill()
+
+    // Sprint dust — little kicked-up puffs trailing a running soldier.
+    if (this.sprintTime > 0 && this.moving) {
+      const bx = x - Math.cos(this.angle)
+      const by = y - Math.sin(this.angle)
+      ctx.fillStyle = 'rgba(190,175,150,0.5)'
+      for (let i = 1; i <= 3; i++) {
+        const t = this.walkPhase * 2 + i
+        const r = 1.6 + (i % 2) * 1.2
+        ctx.beginPath()
+        ctx.arc(bx - Math.cos(this.angle) * i * 4 + Math.sin(t) * 2, by - Math.sin(this.angle) * i * 4 + 3, r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
 
     ctx.save()
     ctx.translate(x, y)

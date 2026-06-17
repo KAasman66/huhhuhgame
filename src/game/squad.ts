@@ -203,6 +203,18 @@ export class Squad {
     }
   }
 
+  /**
+   * Double-time! Every able soldier breaks into a sprint (run time scales with
+   * rank). Returns true if at least one soldier actually started running, so
+   * the caller can play feedback. Soldiers on cooldown are skipped.
+   */
+  sprint(): boolean {
+    if (this.mounted()) return false
+    let any = false
+    for (const s of this.alive()) if (s.sprint()) any = true
+    return any
+  }
+
   halt() {
     for (const s of this.alive()) s.stop()
     const l = this.leader()
