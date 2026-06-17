@@ -276,7 +276,7 @@ export class Game {
     const animalCount = 4 + rng.int(0, 3)
     for (let i = 0; i < animalCount; i++) {
       const p = this.findOpen(rng.range(WORLD_W * 0.2, WORLD_W * 0.85), rng.range(WORLD_H * 0.12, WORLD_H * 0.88))
-      this.animals.push(new Animal(p.x, p.y, rng.next() < 0.5 ? 'dog' : 'pig'))
+      this.animals.push(new Animal(p.x, p.y, 'dog'))
     }
 
     this.placeProps(rng, spawn)

@@ -343,13 +343,14 @@ class ArtStore {
     // Prefix with the Vite base so assets resolve under a sub-path too
     // (GitHub Pages /huhhuhgame/) as well as at a domain root (Netlify).
     const B = import.meta.env.BASE_URL
-    const [sheet, sheet2, tilesImg, bootHillImg, newAssImg, moreImg] = await Promise.all([
+    const [sheet, sheet2, tilesImg, bootHillImg, newAssImg, moreImg, moew3Img] = await Promise.all([
       loadImage(`${B}art/sheet.png`),
       loadImage(`${B}art/sheet2.png`),
       loadImage(`${B}art/tiles.png`),
       loadImage(`${B}art/boothill.png`),
       loadImage(`${B}art/newass.png`),
       loadImage(`${B}art/more.png`),
+      loadImage(`${B}art/moew3.png`),
     ])
 
     // The pack numbers its files with gaps: 01–30, 38–44, 46–55.
@@ -394,6 +395,9 @@ class ArtStore {
 
     // Scatter props (wrecked cars, ruins, junk, fences, nature) from more.png.
     if (moreImg) safe('more', () => this.parseMore(moreImg))
+
+    // Better civilians + dogs from moew3 (overrides newass civilians/animals).
+    if (moew3Img) safe('moew3', () => this.parseMoew3(moew3Img))
 
     this.ready = true
     console.info('[art] loaded', this.summary())
@@ -498,6 +502,84 @@ class ArtStore {
     // Reading order (row-major) so the same seed always picks the same props.
     comps.sort((a, b) => (Math.abs(a.y0 - b.y0) < 40 ? a.x0 - b.x0 : a.y0 - b.y0))
     this.scatter = comps.map((b) => cropToSprite(ctx, b))
+  }
+
+  /**
+   * moew3 sheet: detailed civilian figures + dogs + pigs (left columns) and a
+   * prop pack (right). We take only the people and the dogs:
+   *   - upright human rows → civilians (front-facing = every other blob L→R)
+   *   - the short/wide animal row → dogs only (warm-brown avg colour; pigs are
+   *     pinker and are deliberately skipped — no pigs in the game)
+   * Overrides the newass civilians/animals. Pig sprite is forced null.
+   */
+  private parseMoew3(img: HTMLImageElement) {
+    const W = img.width
+    const H = img.height
+    const c = document.createElement('canvas')
+    c.width = W
+    c.height = H
+    const ctx = c.getContext('2d', { willReadFrequently: true })!
+    ctx.drawImage(img, 0, 0)
+    keyOutBackground(ctx, W, H)
+    const comps = findComponents(ctx, W, H, 600).filter((b) => b.x0 < W * 0.42)
+    if (comps.length === 0) return
+    const midY = (b: Box) => (b.y0 + b.y1) / 2
+    const hOf = (b: Box) => b.y1 - b.y0
+    const wOf = (b: Box) => b.x1 - b.x0
+
+    // Cluster into rows.
+    comps.sort((a, b) => midY(a) - midY(b))
+    const rows: Box[][] = []
+    for (const b of comps) {
+      const r = rows.find((r) => Math.abs(midY(r[0]) - midY(b)) < 45)
+      if (r) r.push(b)
+      else rows.push([b])
+    }
+
+    const avgBlue = (b: Box) => {
+      const w = b.x1 - b.x0 + 1
+      const h = b.y1 - b.y0 + 1
+      const dd = ctx.getImageData(b.x0, b.y0, w, h).data
+      let sum = 0
+      let n = 0
+      for (let i = 0; i < w * h; i++) {
+        if (dd[i * 4 + 3] < 40) continue
+        sum += dd[i * 4 + 2]
+        n++
+      }
+      return n ? sum / n : 255
+    }
+
+    const civ: Box[] = []
+    let dog: Box | null = null
+    for (const row of rows) {
+      const hAvg = row.reduce((s, b) => s + hOf(b), 0) / row.length
+      const wAvg = row.reduce((s, b) => s + wOf(b), 0) / row.length
+      row.sort((a, b) => a.x0 - b.x0)
+      if (hAvg >= 72 && hAvg <= 100 && wAvg < 60) {
+        // Upright people: front-facing = even index (front/back pairs L→R).
+        // Validate each box too, so stray props never sneak in as civilians.
+        for (let i = 0; i < row.length; i += 2) {
+          const b = row[i]
+          if (hOf(b) >= 72 && hOf(b) <= 100 && wOf(b) < 60) civ.push(b)
+        }
+      } else if (hAvg >= 42 && hAvg <= 68 && wAvg < 70) {
+        // Animal row: keep the first warm-brown dog, skip the pinker pigs.
+        for (const b of row) {
+          if (!dog && avgBlue(b) < 52) dog = b
+        }
+      }
+    }
+    if (dog) this.animals.dog = cropToSprite(ctx, dog) // override the newass dog
+
+    // Cap variety to a clean spread of distinct civilians.
+    let picks = civ
+    if (picks.length > 16) {
+      const stride = picks.length / 16
+      picks = Array.from({ length: 16 }, (_, i) => civ[Math.floor(i * stride)])
+    }
+    if (picks.length > 0) this.civilians = picks.map((b) => cropToSprite(ctx, b))
+    this.animals.pig = null // pigs intentionally excluded from the game
   }
 
   private parseTitleFromSheet(img: HTMLImageElement) {

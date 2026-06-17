@@ -13,7 +13,7 @@ export interface BuildingStats {
 export const BUILDING_STATS: Record<BuildingType, BuildingStats> = {
   tower: { name: 'GUN TOWER', hp: 220, size: 34, cost: 400 },
   barracks: { name: 'BARRACKS', hp: 350, size: 46, cost: 600 },
-  factory: { name: 'WAR FACTORY', hp: 420, size: 54, cost: 900 },
+  factory: { name: 'WAR FACTORY', hp: 420, size: 62, cost: 900 },
   hq: { name: 'ENEMY HQ', hp: 700, size: 64, cost: 0 },
   spawner: { name: 'ENEMY BARRACKS', hp: 320, size: 46, cost: 0 },
   etower: { name: 'ENEMY TOWER', hp: 200, size: 34, cost: 0 },
@@ -72,7 +72,8 @@ export class Building {
     // AI sprite path
     const sp = art.buildings[this.type]
     if (sp) {
-      const w = size * 1.45
+      // The war factory is a hulking landmark — render it noticeably larger.
+      const w = size * (this.type === 'factory' ? 2.0 : 1.45)
       const h = (w * sp.h) / sp.w
       ctx.drawImage(sp.c, x - w / 2, y - h * 0.58, w, h)
       this.renderHpBar(ctx)
