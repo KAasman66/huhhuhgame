@@ -5,6 +5,8 @@
 > **Stack:** TypeScript + Vite + Canvas 2D + WebAudio. Geen runtime-dependencies. Graphics: AI-sheets + echte tree-PNGs, met procedural fallback. Muziek: echte mp3-tracks, SFX procedureel.
 >
 > **Repo:** https://github.com/KAasman66/huhhuhgame (branch `main`).
+>
+> **Speel live:** https://kaasman66.github.io/huhhuhgame/ (GitHub Pages, auto-deploy per push naar `main`).
 
 ---
 
@@ -22,7 +24,7 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill.
 
 ---
 
-## Status (17 jun 2026 — sessie 9)
+## Status (19 jun 2026 — sessie 9)
 
 | Onderdeel | Status |
 |---|---|
@@ -35,18 +37,20 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill.
 | **Per-missie biomes** (green/meadow/woodland/autumn/snow), grass-dominant | ✅ |
 | **Ground-decals** (kraters, scorch, bloemvelden) tussen terrein en units | ✅ nieuw |
 | Boot Hill: marmeren stijlen, family-pictogrammen, namen+leeftijd onder de steen | ✅ |
-| AI art: sheet.png, sheet2.png, tiles.png + **Gemini war-factory & civilians** | ✅ |
+| AI art: sheet.png, sheet2.png, tiles.png + **WAR FACTORY (newass) + 16 civilians & honden (moew3)** | ✅ |
+| **Grotere WAR FACTORY** (size 62, sprite-schaal 2.0×) | ✅ nieuw |
 | Echte bomen/struiken (CC-BY 3.0) + bos = dekking | ✅ |
 | Depth/occlusie: units lopen achter gebouwen, props & boomstam, onder kruin | ✅ |
-| Environment props: vaten, kratten, zandzakken, struiken, **rotsen, boomstammen** | ✅ |
+| Environment props: vaten, kratten, zandzakken, struiken, **122 scatter-sprites (more.png)** | ✅ |
+| **Coherente stage-opbouw** (gehuchten/roadside-wrakken/verdedigingslinie/treeline i.p.v. random) | ✅ nieuw |
+| **Ambient honden** die van gunfire wegvluchten (geen varkens) | ✅ |
 | **Sprite-slicing via connected-components** (geen half-afgesneden tanks/gebouwen meer) | ✅ |
 | Boomstam-collisie (loop om de stam, onder de bladeren door) | ✅ |
 | A* pathfinding + cohesieve squad-follow (routet ook om props/stammen) | ✅ |
 | Per-level muziek (mp3) + titel-mp3 (default UIT) | ✅ |
 | Gunfire + gevarieerde hit-grunts | ✅ |
-| GitHub remote + push | ✅ staat erop |
-| GitHub Pages Actions-workflow | ⚠️ `deploy.yml` aanwezig (build slaagt); deploy faalt tot Pages-source op "GitHub Actions" staat (user-actie) |
-| Netlify deploy-config | ✅ `netlify.toml` aanwezig (aanbevolen route — zie Deploy) |
+| **GitHub Pages live** (auto-deploy per push, relatieve asset-paden) | ✅ kaasman66.github.io/huhhuhgame |
+| Netlify deploy-config | ✅ `netlify.toml` aanwezig (alternatief — zie Deploy) |
 
 ---
 
@@ -60,13 +64,13 @@ Spelen: **ENTER** = campagne · **E** = endless · **B** = Boot Hill.
 | **G** | Seeking missile (leader vuurt, homing + boom, detoneert op min-safe-distance) |
 | **S** | Formatie wisselen (column ↔ spread) |
 | **E** | Shop (towers/barracks/factory/recruits/vehicles) |
-
-> **Alles is óók muis-klikbaar:** menu-items, stage-rijen op de stage-select, alle action-bar-knoppen (COLUMN/SPREAD, SHOP, MISSILE, PAUSE) en de muziek-noot (doorgestreept = uit). Geregeld via het generieke `clickZones`-systeem in `game.ts` (render registreert rects, update consumeert kliks).
 | **SPACE** | Uit voertuig stappen; bevestig briefing/debrief |
 | **P** | Pauze aan/uit |
 | **M** | Muziek aan/uit (titel = mp3, in-game = level-track) |
 | **ESC** | Annuleer build-mode / sluit menu / terug naar titel |
 | **R** | Retry na game over |
+
+> **Alles is óók muis-klikbaar:** menu-items, stage-rijen op de stage-select, alle action-bar-knoppen (COLUMN/SPREAD, SHOP, MISSILE, PAUSE) en de muziek-noot (doorgestreept = uit). Geregeld via het generieke `clickZones`-systeem in `game.ts` (render registreert rects, update consumeert kliks).
 
 ---
 
@@ -94,7 +98,7 @@ src/
 │   ├── civilian.ts      Paniek, follow, rescue
 │   ├── animal.ts        Ambient dog/pig: wander + flee gunfire; geen combat-interactie
 │   ├── pickup.ts        Cash / medkit / grenades
-│   └── prop.ts          ★ Battlefield props: barrel (explosief), crate (loot), sandbag (cover), bush (tree-art), rock (procedural massieve cover), log (procedural destructible cover)
+│   └── prop.ts          ★ Battlefield props: barrel (explosief), crate (loot), sandbag (cover), bush (tree-art), scatter (more.png-sprite, base-anchored solide cover)
 └── game/
     ├── game.ts          ★ Orkestratie (~1400 regels): update, collision, win/lose, fog, depth-sort render, muziek-transities
     ├── squad.ts         ★ Leider-A* + breadcrumb-follow + separatie
@@ -142,9 +146,9 @@ src/
 - Tile-atlas (9×6) wordt in **per-biome paletten** gesneden: `green`, `meadow`, `woodland`, `autumn`, `snow`. Allemaal grass-dominant — geen cobble/asfalt-wegen meer (user vond die "kut"). Alleen water blokkeert; grond-tiles zijn decoratie.
 - `loadMission` kiest een biome uit een vaste `BIOMES`-lijst op missie-index en roept `art.setBiome(...)` **vóór** `new Terrain(...)` zodat de terrein-generator het juiste palet leest. Endless = `green`.
 
-### Sprite-slicing (`core/art.ts` → `detectSpriteRows`, `keyOutFlatGrey`, `parseGemini`)
+### Sprite-slicing (`core/art.ts` → `detectSpriteRows`, `keyOutBackground`, `findComponents`)
 - **`detectSpriteRows()`** doet connected-component-detectie (flood-fill → rijen) i.p.v. een vast 4×4-grid. Loste de half-afgesneden tanks/gebouwen op (brede voertuigen straddelden de cel-randen).
-- **`keyOutFlatGrey()`** keyt de neutraal-grijze (~120/180) checkerboard-achtergrond van de Gemini-image naar transparant (`keyOutBackground` keyde alleen near-white).
+- **`keyOutBackground()`** keyt de wit/lichtgrijze checkerboard-achtergrond (mx>155, mx-mn<32) via border-flood naar transparant; `findComponents()` labelt daarna alle opake blobs. Beide gebruikt door parseNewAss/parseMore/parseMoew3. (`keyOutFlatGrey` is een oudere variant voor 120/180-grijs, nu ongebruikt.)
 - **`parseMoew3()`** override civilians + hond uit `moew3.png` (links): upright human-rijen → 16 front-facing civilians (even index per rij, per-box gevalideerd), dieren-rij → eerste warm-bruine **hond** (avg-blauw <52); **varkens worden bewust overgeslagen** en `animals.pig` = null. Loopt ná `parseNewAss` (overschrijft diens civilians/dog; factory blijft newass). Verifieerd: 16 civ ~38–53×78–88, dog 49×54, pig null.
 - **`parseMore()`** snijdt `public/art/more.png` (wit checkerboard → `keyOutBackground`) in alle connected-components (minArea 400), gesorteerd in leesvolgorde → `art.scatter` (122 sprites). Game schaalt + plaatst ze; collision uit footprint. Verifieerd: 122 slices, schoon uitgesneden.
 - **`parseNewAss()`** haalt uit `public/art/newass.png` (wit/lichtgrijs checkerboard → `keyOutBackground`) de **war-factory** (grootste blob), **dog + pig** (onderste rij, front = linker van elk paar), en **10 civilians** (front-facing = elke even blob per rij L→R). Barracks blijft bewust de oude sheet2-sprite. Verifieerd: factory 661×465, dog 105×137, pig 111×131, 10 civ-crops. (`parseGemini`/`gemini.png` zijn vervangen.)
@@ -154,7 +158,7 @@ src/
 - **Boomstam:** elke boom heeft naast de cover-radius (`r`) een kleine solide **trunk-radius** (`tr`, ≤8px) in `terrain.trunkBlocked()`. Die zit in `blockTest` → units (en de A*-pathfinder) lopen **om de stam** terwijl de kruin (`renderCanopies`) er nog steeds overheen tekent: je loopt *achter de stam langs, onder de bladeren door*.
 
 ### Environment props & decals (`entities/prop.ts`, `game.ts` → `placeProps`/`placeDecals`/`renderDecals`)
-- Zes prop-soorten, per missie geschaald (`placeProps`, density ∝ missie-index):
+- Vijf prop-soorten, per missie geschaald (`placeProps`, density ∝ missie-index):
   - **`barrel`** — explosief (olijf-metalen drum). Kapotschieten → `explode()` die **buur-vaten kettingt** (Postal-chaos). Geverifieerd in browser: trio detoneert in één klap, geen recursion-crash.
   - **`crate`** — destructible loot-cover (houten munitie-kist); sloop dropt cash/medkit/grenades (70%).
   - **`sandbag`** — taaie cover (zandzak-muur, hp 200); houdt vuur tegen tot een blast/zware beschieting hem sloopt.
@@ -198,7 +202,7 @@ Props worden **niet meer willekeurig gestrooid** maar in zones rond terrein-feat
 | `public/audio/level{1,2,3}.mp3` | Level-muziek (RAWONON / SWOEWM / RuimteNietBeschikbaar) |
 | `art/` (root) | Bron-images — **niet geladen door Vite**, `/art/` is gegitignored. Bevat o.a. `asses.png`, `barrel.png`, `people.png`, `picto.png` (referentie voor family-pictogrammen) |
 
-Vite serveert `public/` statisch op `/art/...` en `/audio/...` (absolute paden — zie Deploy).
+Vite serveert `public/` statisch. Assets worden geladen met **`import.meta.env.BASE_URL`-prefix** en `base: './'` (relatief) → werkt zowel op een domein-root (Netlify) als onder een sub-pad (`/huhhuhgame/` op Pages). Zie Deploy.
 
 ---
 
@@ -221,13 +225,10 @@ Endless: `[E]` op titel. High score in progress.
 
 ## Deploy
 
-Statische Vite-build (`npm run build` → `dist/`, ~86KB JS gzip 28KB; `dist/` is gegitignored). **Belangrijk:** assets worden geladen met **absolute paden** (`/art/...`, `/audio/...`).
+Statische Vite-build (`npm run build` → `dist/`, ~118KB JS gzip 38KB; `dist/` is gegitignored). `vite.config` heeft **`base: './'`** en alle assets laden via `import.meta.env.BASE_URL` → relatieve paden, werkt op elk sub-pad.
 
-- **Netlify (aanbevolen, nul aanpassingen):** root-domein, dus absolute paden kloppen. `netlify.toml` staat klaar (build=`npm run build`, publish=`dist`, Node 20).
-  - A) app.netlify.com → Import → GitHub → `KAasman66/huhhuhgame` → Deploy (auto-deploy per push).
-  - B) app.netlify.com/drop → sleep `dist/` erin (handmatig, geen Git).
-  - *Account-acties (inloggen/Deploy klikken) doet de user zelf.*
-- **GitHub Pages:** `.github/workflows/deploy.yml` staat klaar (build via `npm install` — niet `npm ci`, want de lockfile is op Windows gemaakt en Vite's rolldown pulls platform-specifieke native deps). De **build-job slaagt**, maar de **deploy-job faalt** zolang de Pages-source niet op "GitHub Actions" staat (Pages API 404). Dat is een **user-actie** in de repo-settings; daarna deployt elke push automatisch. Asset-paden gebruiken absolute `/art`+`/audio` — werkt op Pages alleen als de site op het root-domein staat (user-Pages of custom domain), niet onder `/huhhuhgame/`. User koos voorlopig Netlify Drop.
+- **GitHub Pages (LIVE, primair):** https://kaasman66.github.io/huhhuhgame/. `.github/workflows/deploy.yml` bouwt (via `npm install` — niet `npm ci`, want de lockfile is op Windows gemaakt en Vite's rolldown pulls platform-specifieke native deps) en deployt. Pages-source staat op "GitHub Actions" → **elke push naar `main` deployt automatisch**. Geverifieerd: root 200, assets (`huhhuhgame/art/...`) 200, deployed JS-hash matcht de build.
+- **Netlify (alternatief):** `netlify.toml` staat klaar (build=`npm run build`, publish=`dist`, Node 20). app.netlify.com → Import → GitHub, of app.netlify.com/drop → sleep `dist/` erin. *Account-acties doet de user zelf.*
 
 ---
 
@@ -243,9 +244,9 @@ Handmatig: `npm run dev` → ENTER → SPACE (briefing) → LMB move, RMB hold t
 
 1. **Vijand-AI via pathfinder** — achtervolgende vijanden lopen nog dom tegen meren aan; speler heeft wél A*. Per-frame repathing throttlen.
 2. **Audio-mix balans** in een echte browser checken (muziek 0.5, titel 0.6, grunt ~0.16–0.23) — eenvoudig bij te stellen in `audio.ts`.
-3. **GitHub Pages** afmaken als de user dat naast/i.p.v. Netlify wil (zie Deploy).
+3. **Scatter-collision** is één cirkel per sprite; brede wrakken/lange hekken voelen daardoor soms te "rond". Eventueel capsule/multi-cirkel voor grote scatter.
 4. Nice-to-have: gamepad, enemy turret-rotatie op AI-buildings, 4-frame walk cycle.
 
 ---
 
-*Bijgewerkt: 17 jun 2026 (sessie 9) — Coherente stage-opbouw: props in zones (geruïneerde gehuchten langs de weg met civilians/honden, roadside-wrakken, verdedigingslinie bij de HQ, treeline-dekking) i.p.v. willekeurig strooien; scatter geclassificeerd op vorm (vehicle/ruin/junk). Eerder: Grotere WAR FACTORY (size 54→62, sprite-schaal 2.0× i.p.v. 1.45×). Betere civilians + honden uit `moew3.png` (`parseMoew3`); varkens verwijderd uit het spel. Eerder: `more.png` prop-pack: 122 scatter-sprites (wrakken, ruïnes, junk, hekken, speeltuig, natuur) sprinkelen over de stages als echte solide cover; vervangt de procedurele rock/log ("geen lelijke SVG meer"). Eerder: Nieuwe `newass.png`-assets: war-factory + 10 front-facing civilians + dog/pig (via `parseNewAss`, vervangt gemini). Ambient wildlife (`animal.ts`): honden & varkens die alleen van gunfire wegvluchten, geen combat-interactie. Double-click = double-time sprint (looptijd ∝ rank, cooldown). Grotere tanks (render 66px / collision 42, jeeps mee opgeschaald) en rijkere battlefields: nieuwe props `rock` (massieve cover) + `log` (destructible cover) plus niet-collidende ground-decals (kraters, scorch, bloemvelden) tussen terrein en units. Eerder deze sessie-reeks: nieuwe tagline "Either war is obsolete or men are.", per-missie biomes (grass-dominant, geen wegen), volledig klikbare UI + stage select, homing missiles i.p.v. grenades, connected-component sprite-slicing (geen half-afgesneden tanks/gebouwen), Gemini war-factory + civilians, muziek default uit, MEAT GRINDER rename, Boot Hill met namen+leeftijd onder de stenen.*
+*Bijgewerkt: 19 jun 2026 (sessie 9) — **Live op https://kaasman66.github.io/huhhuhgame/** (GitHub Pages auto-deploy, relatieve `base:'./'`-paden). Coherente stage-opbouw: props in zones (geruïneerde gehuchten langs de weg met civilians/honden, roadside-wrakken, verdedigingslinie bij de HQ, treeline-dekking) i.p.v. willekeurig strooien; scatter geclassificeerd op vorm (vehicle/ruin/junk). Eerder: Grotere WAR FACTORY (size 54→62, sprite-schaal 2.0× i.p.v. 1.45×). Betere civilians + honden uit `moew3.png` (`parseMoew3`); varkens verwijderd uit het spel. Eerder: `more.png` prop-pack: 122 scatter-sprites (wrakken, ruïnes, junk, hekken, speeltuig, natuur) sprinkelen over de stages als echte solide cover; vervangt de procedurele rock/log ("geen lelijke SVG meer"). Eerder: Nieuwe `newass.png`-assets: war-factory + 10 front-facing civilians + dog/pig (via `parseNewAss`, vervangt gemini). Ambient wildlife (`animal.ts`): honden & varkens die alleen van gunfire wegvluchten, geen combat-interactie. Double-click = double-time sprint (looptijd ∝ rank, cooldown). Grotere tanks (render 66px / collision 42, jeeps mee opgeschaald) en rijkere battlefields: nieuwe props `rock` (massieve cover) + `log` (destructible cover) plus niet-collidende ground-decals (kraters, scorch, bloemvelden) tussen terrein en units. Eerder deze sessie-reeks: nieuwe tagline "Either war is obsolete or men are.", per-missie biomes (grass-dominant, geen wegen), volledig klikbare UI + stage select, homing missiles i.p.v. grenades, connected-component sprite-slicing (geen half-afgesneden tanks/gebouwen), Gemini war-factory + civilians, muziek default uit, MEAT GRINDER rename, Boot Hill met namen+leeftijd onder de stenen.*
